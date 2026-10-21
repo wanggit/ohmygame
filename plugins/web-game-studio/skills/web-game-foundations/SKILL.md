@@ -27,6 +27,12 @@ Use this skill for architecture decisions or cross-cutting changes. For focused 
 
 Use these boundaries in proportion to the project. A small game does not need an enterprise framework, but its rules should not become inseparable from rendering callbacks.
 
+## Game Data Tables
+
+- Balance numbers, tuning values and configuration lists live in canvas tables (`canvas/tables/<tableId>.json`), which the user reviews and adopts in the canvas. One table per system (for example economy, enemy stats, item stats, stage config); typed columns and stable column IDs are the data contract.
+- Load each table once at startup — import the JSON module or fetch the workspace-relative path — and read values through the column IDs. Do not scatter raw balance numbers through gameplay code.
+- A table save reloads the preview page automatically, so saved tuning takes effect without code changes. Keep the game cleanly restartable so tuning stays observable.
+
 ## Before Implementation
 
 For a new or substantially changed game, establish:
@@ -36,6 +42,7 @@ For a new or substantially changed game, establish:
 - camera and input model
 - simulation and rendering ownership
 - asset organization and loading states
+- which game data tables hold balance and configuration values
 - HUD and menu surfaces
 - save, debug, and performance expectations
 

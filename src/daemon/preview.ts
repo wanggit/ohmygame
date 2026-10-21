@@ -11,6 +11,7 @@ import { createServer } from "node:net";
 import path from "node:path";
 import type { ProjectState } from "../shared/contracts.js";
 import type { RuntimeEventBus } from "../shared/events.js";
+import { isCanvasTablePath } from "../shared/canvas-table.js";
 import { supportsWebPreview } from "../shared/project-runtime.js";
 import {
   packageManagerRunArguments,
@@ -43,6 +44,7 @@ interface PreviewSession {
   project: ProjectState;
   paused: boolean;
   dirty: boolean;
+  tableDirty: boolean;
   leases: Map<string, number>;
   idleSince?: number;
   watcher?: FSWatcher;
@@ -99,6 +101,7 @@ export class PreviewManager {
         project,
         paused: false,
         dirty: false,
+        tableDirty: false,
         leases: new Map(),
         revision: 0,
       };
@@ -691,11 +694,17 @@ export class PreviewManager {
           )
             return;
           session.dirty = true;
+          if (isCanvasTablePath(String(filename ?? "").replaceAll("\\", "/")))
+            session.tableDirty = true;
           clearTimeout(session.changeTimer);
           session.changeTimer = setTimeout(() => {
             session.changeTimer = undefined;
+            const tableChanged = session.tableDirty;
+            session.tableDirty = false;
             if (session.project.preview.status === "ready") {
-              if (session.project.preview.command === "Serve static files")
+              // Table saves always reload the page so the running game restarts
+              // from the saved numbers; other edits follow the preview mode.
+              if (tableChanged || session.project.preview.command === "Serve static files")
                 this.#proxies.get(session.project.id)?.reload();
             } else void this.automatic(session.project, true).catch(() => {});
           }, 800);
@@ -712,6 +721,7 @@ export class PreviewManager {
     session.watcher = undefined;
     clearTimeout(session.changeTimer);
     session.changeTimer = undefined;
+    session.tableDirty = false;
   }
 
   async #savedProxyPort(project: ProjectState): Promise<number | undefined> {

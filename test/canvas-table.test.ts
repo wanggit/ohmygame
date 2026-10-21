@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  canvasTablePath,
   createCanvasTable,
   importCanvasCsv,
   isCanvasTable,
+  isCanvasTablePath,
   mergeCanvasTable,
   parseCanvasCell,
   parseDelimitedTable,
@@ -11,6 +13,16 @@ import {
 } from "../src/shared/canvas-table.js";
 
 describe("canvas tables", () => {
+  it("recognizes saved table files as game data changes", () => {
+    expect(isCanvasTablePath(canvasTablePath("items"))).toBe(true);
+    expect(isCanvasTablePath("canvas/tables/items.json")).toBe(true);
+    expect(isCanvasTablePath("canvas\\tables\\items.json")).toBe(true);
+    expect(isCanvasTablePath("canvas/tables/items.json.tmp")).toBe(false);
+    expect(isCanvasTablePath("canvas/tables/nested/items.json")).toBe(false);
+    expect(isCanvasTablePath("canvas/documents/design.md")).toBe(false);
+    expect(isCanvasTablePath("assets/tables/items.json")).toBe(false);
+    expect(isCanvasTablePath("canvas/index.json")).toBe(false);
+  });
   it("round-trips spreadsheet data with quotes, Unicode, empty cells and multiline text", () => {
     const table = importCanvasCsv(
       createCanvasTable(),

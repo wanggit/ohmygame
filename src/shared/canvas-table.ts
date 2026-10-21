@@ -41,6 +41,11 @@ export type CanvasTableGenerationResponse = CanvasTableGenerationResult & {
 export const MAX_TABLE_ROWS = 1000;
 export const MAX_TABLE_COLUMNS = 100;
 export const canvasTablePath = (id: string) => `canvas/tables/${id}.json`;
+/** Whether a workspace-relative path is a saved game data table (`canvas/tables/<id>.json`). */
+export const isCanvasTablePath = (relativePath: string): boolean => {
+  const parts = relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
+  return parts.length === 3 && parts[0] === "canvas" && parts[1] === "tables" && /\.json$/i.test(parts[2]!);
+};
 export const canvasCell = (
   row: CanvasTableRow,
   columnId: string,

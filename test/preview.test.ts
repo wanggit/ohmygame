@@ -344,6 +344,53 @@ describe("PreviewManager", () => {
     ).rejects.toThrow();
   });
 
+  it("reloads a ready preview when a game data table saves and stays quiet on ordinary edits", async () => {
+    const workspacePath = await createWorkspace(false);
+    await mkdir(path.join(workspacePath, "canvas", "tables"), { recursive: true });
+    // Serve HTML so the preview proxy injects its reload bridge.
+    await writeFile(
+      path.join(workspacePath, "server.mjs"),
+      `
+      import { createServer } from "node:http";
+      const portIndex = process.argv.indexOf("--port");
+      const port = Number(process.env.PORT || process.argv[portIndex + 1]);
+      createServer((_request, response) => response.writeHead(200, { "content-type": "text/html" }).end("<head></head>")).listen(port, "127.0.0.1");
+    `,
+    );
+    const project = createProject(workspacePath);
+    const manager = new PreviewManager(new RuntimeEventBus(), {
+      readinessTimeoutMs: 2_000,
+    });
+    managers.push(manager);
+    const url = await manager.start(project);
+    expect(project.preview.status).toBe("ready");
+    expect(project.preview.command).not.toBe("Serve static files");
+    const html = await (await fetch(`${url}/?__ohmygame_client=editor`)).text();
+    const bridge = new URL(
+      html.match(/src="([^"]+bridge[^"]+)"/)![1],
+      url,
+    ).toString();
+    const stream = (await fetch(`${bridge}&events=1`)).body!.getReader();
+    expect(new TextDecoder().decode((await stream.read()).value)).toContain(
+      '"reload":0',
+    );
+    const pending = stream.read();
+    await writeFile(path.join(workspacePath, "notes.txt"), "ordinary edit");
+    expect(
+      await Promise.race([
+        pending,
+        new Promise((resolve) => setTimeout(() => resolve("quiet"), 1500)),
+      ]),
+    ).toBe("quiet");
+    await writeFile(
+      path.join(workspacePath, "canvas", "tables", "items.json"),
+      JSON.stringify({ version: 1, id: "items", title: "Items", columns: [], rows: [] }),
+    );
+    expect(new TextDecoder().decode((await pending).value)).toContain(
+      '"reload":1',
+    );
+  });
+
   it("starts and stops a preview process tree", async () => {
     const workspacePath = await createWorkspace(false);
     const project = createProject(workspacePath);

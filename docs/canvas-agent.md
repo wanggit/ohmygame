@@ -79,6 +79,14 @@ for explicit adoption. Invalid or incomplete output preserves the table, and AI
 instructions and valid candidates survive reloads. Adopting an AI draft is one
 table undo step.
 
+Tables are also the game's data pipeline for balance and configuration values:
+game code loads `canvas/tables/<table-id>.json` once at startup (import the JSON
+module or fetch the workspace-relative path) and reads values through the stable
+column IDs. After a table save the preview page reloads automatically — for any
+editor, including the agent writing the file — so the running game restarts from
+the saved numbers without a code change. Ordinary file edits keep the existing
+preview behavior and do not force a reload on development servers.
+
 Canvas generation prompts use Enter to generate and Shift+Enter for a new line.
 Enter confirms an active input-method composition or a video `@` reference
 suggestion before it can generate. Text and document content, negative prompts,
