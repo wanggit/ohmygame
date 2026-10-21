@@ -2133,6 +2133,16 @@ const en = {
     savingInterrupted:
       "Saving was interrupted. Review the document before adopting the candidate draft again.",
   },
+  designGate: {
+    group: "Design confirmation",
+    awaiting: "Awaiting design confirmation",
+    stale: "Edited since confirmation",
+    confirmed: "Design confirmed",
+    confirm: "Confirm design",
+    confirmTitle: "Confirm the current main design so the agent can generate media",
+    reopen: "Reopen",
+    reopenTitle: "Reopen confirmation; the agent waits for a new confirmation before generating media",
+  },
   canvasDoc: {
     unavailableDraftKept:
       "Document unavailable: {{source}}. Your unsaved draft is kept.",

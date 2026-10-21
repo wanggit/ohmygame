@@ -10,6 +10,7 @@ import { ToolRunner } from "../src/daemon/tools.js";
 import { checkCanvasWorkspace } from "../src/daemon/canvas-check.js";
 import { readCanvasAssets } from "../src/daemon/canvas-assets.js";
 import { createAgentTools } from "../src/daemon/agent-tools.js";
+import { confirmMainDesign } from "../src/daemon/design-confirmation.js";
 import { ImageGenerationError, type ImageGenerator } from "../src/daemon/openai-image.js";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { createCanvasDocument, canvasDocumentPath, mergeCanvasDocumentContent } from "../src/shared/canvas-document.js";
@@ -323,6 +324,7 @@ describe("Markdown design workspace", () => {
     detail.board.editorLayout.nodes.direction = { x: 0, y: 0 };
     await store.saveBoard(project.id, detail.board, detail.revision);
     expect(generate).not.toHaveBeenCalled();
+    if (projectType !== "asset-canvas") await confirmMainDesign(project.workspacePath);
     const registered = createAgentTools(project, tools, projects, undefined, undefined, undefined, undefined, store);
     const check = await registered.find((tool) => tool.name === "canvas_check")!.execute("check", {}, undefined, undefined, {} as never);
     expect(check.details).toMatchObject({ canvasCheck: { ok: true } });

@@ -3,6 +3,7 @@ import { Handle, Position } from "@xyflow/react";
 import type { CanvasWorkspaceDetail } from "../shared/canvas-workspace.js";
 import type { AgentModelRef, AgentReasoningLevel, AssetCanvasTextGenerationSource } from "../shared/contracts.js";
 import type { CanvasMarkdownDocument } from "../shared/canvas-document.js";
+import type { DesignGateState } from "../shared/design-confirmation.js";
 import { Check, Columns2, Copy, Download, Eye, FileText, Image as ImageIcon, Maximize, MoreHorizontal, Pencil, X } from "./icons.js";
 import { CanvasTextarea, CanvasTextInput, CanvasTextComposer, type CanvasTextModels } from "./canvas-text-composer.js";
 import { CanvasContextMenu } from "./editor-canvas.js";
@@ -32,6 +33,9 @@ export interface CanvasDocuments {
   changeGeneration(id: string, patch: Partial<DocumentGenerationState>): void;
   generate(id: string, model: AgentModelRef, reasoningLevel?: AgentReasoningLevel, referenceSource?: AssetCanvasTextGenerationSource): void;
   applyGeneration(id: string): void;
+  designConfirmation?: DesignGateState;
+  confirmDesign?(): void;
+  resetDesignConfirmation?(): void;
 }
 export interface DocumentNodeRuntime extends CanvasTextModels, CanvasNodeReferencesRuntime { design: CanvasDocuments; document?: CanvasWorkspaceDetail["documents"][number]; referenceSource: AssetCanvasTextGenerationSource }
 export function CanvasDocumentNode({ data, selected }: { data: { documentId?: string; documentRuntime?: DocumentNodeRuntime; nodeDetails?: CanvasNodeDetails; resizeRuntime?: CanvasNodeResizeRuntime; panelOpen?: boolean }; selected?: boolean }) {
@@ -51,6 +55,8 @@ export function CanvasDocumentNode({ data, selected }: { data: { documentId?: st
       <div data-alignment-frame className="design-document-node-content">
         <CanvasNodeLabel icon={FileText} label={doc?.title ?? issue?.title ?? t("canvasDoc.missing")} details={data.nodeDetails} className="design-document-node-header"
           titleEditor={isEditing && doc ? <CanvasTextInput className="nodrag" aria-label={t("canvasDoc.title")} value={doc.title} maxLength={200} onChange={(title) => runtime?.design.update(doc.id, { title })} /> : undefined} />
+        {doc?.main && runtime?.design.designConfirmation && runtime.design.designConfirmation.status !== "not-required" && runtime.design.designConfirmation.status !== "no-main-document"
+          ? <DesignConfirmationControl design={runtime.design} state={runtime.design.designConfirmation} /> : null}
         {issue ? <div className="design-document-issue" role="status">{t(doc ? "canvasDoc.unavailableDraftKept" : "canvasDoc.unavailableRestore", { source: issue.source })}</div> : null}
         {doc ? <div ref={bodyRef} className={`design-document-node-body${selected ? " nowheel" : ""}${isEditing ? " nodrag" : " is-preview"}`} onScrollCapture={(event) => {
           const pane = event.target as HTMLElement;
@@ -83,6 +89,17 @@ export function CanvasDocumentNode({ data, selected }: { data: { documentId?: st
     {data.panelOpen && doc && runtime ? <div className="canvas-node-auxiliary"><CanvasDocumentAI design={runtime.design} document={doc} textModels={runtime} references={runtime} referenceSource={runtime.referenceSource} /></div> : null}
   </div>;
 }
+export function DesignConfirmationControl({ design, state }: { design: CanvasDocuments; state: Extract<DesignGateState, { status: "confirmed" | "awaiting" }> }) {
+  const [busy, setBusy] = useState(false);
+  const label = state.status === "confirmed" ? t("designGate.confirmed") : state.reason === "stale" ? t("designGate.stale") : t("designGate.awaiting");
+  return <div className="design-confirmation" data-status={state.status} role="group" aria-label={t("designGate.group")}>
+    <span className="design-confirmation-badge" role="status">{label}</span>
+    {state.status === "confirmed"
+      ? <button type="button" className="nodrag" disabled={busy} title={t("designGate.reopenTitle")} onClick={() => { setBusy(true); design.resetDesignConfirmation?.(); setBusy(false); }}>{t("designGate.reopen")}</button>
+      : <button type="button" className="nodrag" disabled={busy} title={t("designGate.confirmTitle")} onClick={() => { setBusy(true); design.confirmDesign?.(); setBusy(false); }}>{t("designGate.confirm")}</button>}
+  </div>;
+}
+
 export function CanvasMarkdown({
   projectId,
   document,

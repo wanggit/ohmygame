@@ -12,7 +12,8 @@ import { canvasDocumentPath } from "../shared/canvas-document.js";
 import { CanvasBoardEditor } from "./asset-canvas-workspace.js";
 import { createCanvasBoardStorage, type CanvasBoardConflict, type CanvasBoardStorage } from "./canvas-board-storage.js";
 import { LibraryAssetPicker } from "./node-workbench.js";
-import { changeCanvasBoard, createCanvasBoard, deleteCanvasBoard } from "./canvas-api.js";
+import { changeCanvasBoard, createCanvasBoard, deleteCanvasBoard, getDesignConfirmation, setDesignConfirmation } from "./canvas-api.js";
+import type { DesignGateState } from "../shared/design-confirmation.js";
 import { useCanvasDocuments } from "./use-canvas-documents.js";
 import type { CanvasDocuments } from "./canvas-document-node.js";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Code2, Layers3, LoaderCircle, MoreHorizontal, PanelToggle, Pencil, Plus, Trash2, X } from "./icons.js";
@@ -72,6 +73,7 @@ export function CanvasWorkspace({ project, headerActionsTarget = null, onLeaveRe
   const [saveRetrying, setSaveRetrying] = useState(false);
   const [saveAttempt, setSaveAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [designGate, setDesignGate] = useState<DesignGateState>();
   const [boardStatus, setBoardStatus] = useState("loading");
   const [workspaceView, setWorkspaceView] = useState<"canvas" | "code">("canvas");
   const [codeRevision, setCodeRevision] = useState(0);
@@ -134,6 +136,19 @@ export function CanvasWorkspace({ project, headerActionsTarget = null, onLeaveRe
     onConflict: (conflict) => { if (adapterRef.current?.key === adapterKey) setBoardConflict(conflict); }, flushDocuments: async () => { await docsRef.current.flush(); await tablesRef.current.flush(); },
   }) : undefined;
   const adapter = adapterRef.current;
+  const mainRevision = workspace?.documents.find((doc) => doc.main)?.revision;
+  useEffect(() => {
+    if (singleBoard || !workspace) return;
+    void getDesignConfirmation(project.id).then(setDesignGate).catch(() => setDesignGate(undefined));
+  }, [project.id, singleBoard, workspace === undefined, mainRevision]);
+  const confirmDesign = useCallback(() => { void run(async () => {
+    // Confirm the saved design: flush local edits so the recorded revision matches what the user read.
+    await flush();
+    setDesignGate(await setDesignConfirmation(project.id, "confirm", writeVersion));
+  }); }, [run, flush, project.id, writeVersion]);
+  const resetDesignConfirmation = useCallback(() => { void run(async () => {
+    setDesignGate(await setDesignConfirmation(project.id, "reset", writeVersion));
+  }); }, [run, project.id, writeVersion]);
   const design: CanvasDocuments = {
     projectId: project.id, documents: workspace?.documents ?? [], documentIssues: workspace?.documentIssues,
     add: () => run(() => docsRef.current.create()),
@@ -143,6 +158,9 @@ export function CanvasWorkspace({ project, headerActionsTarget = null, onLeaveRe
       void docsRef.current.generate(id, model, reasoningLevel, referenceSource, () => boardSave.current?.() ?? Promise.resolve());
     }, applyGeneration: docs.applyGeneration,
     setMain: singleBoard ? undefined : (id) => { void run(() => docsRef.current.setMain(id)); },
+    designConfirmation: designGate,
+    confirmDesign: singleBoard ? undefined : confirmDesign,
+    resetDesignConfirmation: singleBoard ? undefined : resetDesignConfirmation,
     insertImage: (id, assetId) => { void run(() => docsRef.current.insertImage(id, assetId)); },
     pickImage: (id) => {
       setInsertion({ documentId: id });

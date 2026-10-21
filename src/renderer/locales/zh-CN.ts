@@ -2071,6 +2071,16 @@ const zhCN: typeof en = {
     generationInterrupted: "文档生成被中断。你的指令和候选草稿已保留，请重试。",
     savingInterrupted: "保存被中断。再次采用候选草稿前，请先检查文档。",
   },
+  designGate: {
+    group: "设计确认",
+    awaiting: "待确认设计",
+    stale: "已修改，待重新确认",
+    confirmed: "设计已确认",
+    confirm: "确认设计",
+    confirmTitle: "确认当前主设计，agent 才能生成媒体资源",
+    reopen: "重新打开",
+    reopenTitle: "重新打开确认；agent 将等待新的确认后才能生成媒体",
+  },
   canvasDoc: {
     unavailableDraftKept: "文档不可用：{{source}}。未保存的草稿已保留。",
     unavailableRestore: "文档不可用：{{source}}。请恢复文件后重新加载。",

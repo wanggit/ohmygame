@@ -177,3 +177,9 @@
 .canvas-table-notice[role=alert], .canvas-table-scroll small { color: var(--danger); }
 .canvas-table-scroll small { display: block; padding: 3px 8px; font-size: 10px; }
 .canvas-table-editor > .canvas-table-scroll { margin: 0 16px; }
+.design-confirmation { display: flex; align-items: center; gap: 8px; padding: 2px 12px 0; font-size: 11px; }
+.design-confirmation-badge { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warning); white-space: nowrap; }
+.design-confirmation[data-status="confirmed"] .design-confirmation-badge { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
+.design-confirmation button { padding: 2px 4px; border: 0; background: transparent; color: var(--text-secondary); font: inherit; cursor: pointer; }
+.design-confirmation button:hover { color: var(--text); }
+.design-confirmation button:disabled { cursor: default; opacity: 0.5; }

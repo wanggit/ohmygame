@@ -36,6 +36,8 @@ import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { PluginMcpHost } from "./plugin-mcp-host.js";
 import { projectProcessEnvironment } from "./project-process.js";
 import { createProviderImageReadTool, installDeepSeekImageFiles } from "./deepseek-image-files.js";
+import { designGateForProject } from "./design-confirmation.js";
+import { DESIGN_GATE_TOOL_NAMES, designGateBlockReason } from "../shared/design-confirmation.js";
 import { SessionImages } from "./session-images.js";
 import { installSessionImageRequests } from "./session-image-requests.js";
 import { AGENT_ERROR_ENTRY, assistantMessageError, normalizeAgentError, thrownAgentError } from "./agent-errors.js";
@@ -2912,7 +2914,7 @@ const assistantThinkingSanitizerExtension: ExtensionFactory = (pi) => {
 };
 
 export async function createPiSession(
-  project: Pick<ProjectState, "workspacePath"> & Partial<Pick<ProjectState, "storagePath">> & AgentPromptProject,
+  project: Pick<ProjectState, "workspacePath" | "type"> & Partial<Pick<ProjectState, "storagePath">> & AgentPromptProject,
   sessionManager: SessionManager,
   customTools: ToolDefinition[] = [],
   modelRuntime?: ModelRuntime,
@@ -2946,12 +2948,25 @@ export async function createPiSession(
       return snapshotBeforeMessage();
     }, failCheckpoint)(pi);
   };
+  // Design gate: media production waits for the user's confirmation of the main design document.
+  const designGateFactory: ExtensionFactory = async (pi) => {
+    pi.on("tool_call", async (event) => {
+      if (!DESIGN_GATE_TOOL_NAMES.has(event.toolName)) return;
+      try {
+        const blocked = designGateBlockReason(await designGateForProject(project.workspacePath, project.type));
+        return blocked ? { block: true, reason: blocked } : undefined;
+      } catch (cause) {
+        return { block: true, reason: `Design gate check failed: ${cause instanceof Error ? cause.message : String(cause)}` };
+      }
+    });
+  };
   // Trusted-local phase: cwd guides Pi but is not an OS security boundary.
   const { resourceLoader, sessionSettings, pluginSkills } = await createPiResourceLoader(project.workspacePath, agentDir, {
     resolvePluginSkills,
     appendSystemPrompt: appendSystemPromptForProject(project),
     mcpFactory: mcp?.factory,
     checkpointFactory: guardedCheckpoints,
+    designGateFactory,
   });
   const images = new SessionImages(sessionManager, path.join(agentDir, "request-image-previews"));
   const { session } = await createAgentSession({
@@ -3029,6 +3044,7 @@ async function createPiResourceLoader(
     appendSystemPrompt?: readonly string[];
     mcpFactory?: ExtensionFactory;
     checkpointFactory?: ExtensionFactory;
+    designGateFactory?: ExtensionFactory;
   } = {},
 ): Promise<{ resourceLoader: DefaultResourceLoader; sessionSettings: SettingsManager; pluginSkills: PluginSkillRegistration[] }> {
   await ensureOhMyGamePiEnvironment(agentDir);
@@ -3047,6 +3063,7 @@ async function createPiResourceLoader(
     extensionFactories: [{ name: "openrouter-attribution", factory: openRouterAttributionExtension, hidden: true },
       { name: "assistant-thinking-sanitizer", factory: assistantThinkingSanitizerExtension, hidden: true },
       ...(options.checkpointFactory ? [{ name: "checkpoints", factory: options.checkpointFactory, hidden: true }] : []),
+      ...(options.designGateFactory ? [{ name: "design-gate", factory: options.designGateFactory, hidden: true }] : []),
       ...(options.mcpFactory ? [{ name: "plugin-mcp", factory: options.mcpFactory, hidden: true }] : [])],
     additionalSkillPaths: pluginSkills.map((skill) => skill.path),
     appendSystemPrompt: options.appendSystemPrompt

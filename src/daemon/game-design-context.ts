@@ -2,6 +2,16 @@ import type { ProjectState, PromptContext } from "../shared/contracts.js";
 import { CANVAS_INDEX_FILE, canvasDocumentPath, type CanvasDocumentDetail } from "../shared/canvas-document.js";
 import { readCanvasDocuments, readCanvasIndex } from "./canvas-workspace.js";
 import { canvasBoardPath } from "../shared/canvas-workspace.js";
+import { designGateForProject } from "./design-confirmation.js";
+
+async function designGateLine(project: ProjectState): Promise<string | undefined> {
+  const gate = await designGateForProject(project.workspacePath, project.type);
+  if (gate.status === "not-required") return undefined;
+  if (gate.status === "confirmed") return `Design gate: the main design is user-confirmed (revision ${gate.revision.slice(0, 8)}). Media generation is allowed.`;
+  const wait = "Media generation tools are blocked until the user confirms the main design document. Discuss and finalize the core loop first, then ask the user to confirm it (Design canvas → Confirm design).";
+  if (gate.status === "awaiting") return `Design gate: the main design is ${gate.reason === "stale" ? "edited since the last user confirmation" : "not confirmed by the user yet"}. ${wait}`;
+  return `Design gate: this project has no main design document yet. ${wait}`;
+}
 
 export function gameDesignReference(detail: CanvasDocumentDetail): PromptContext {
   return {
@@ -23,8 +33,10 @@ export async function gameDesignMetadata(project: ProjectState, hadDesign = fals
     if (!index) return hadDesign ? `This project currently has no saved main game design in ${CANVAS_INDEX_FILE}. Do not rely on an earlier document snapshot as the current design.` : undefined;
     const documents = await readCanvasDocuments(project.workspacePath, index);
     const detail = project.type !== "asset-canvas" ? documents.find((document) => document.document.id === index.mainDocumentId) : undefined;
+    const gate = await designGateLine(project);
     return [
       detail ? `Game design: ${JSON.stringify(detail.document.title)}. Source: ${canvasDocumentPath(detail.document.id)}. Revision: ${detail.revision}.` : project.type === "asset-canvas" ? "Asset Canvas: documents are production references; this project has no game runtime or main game design document." : "No main design document is selected.",
+      ...(gate ? [gate] : []),
       `Canvas workspace: canvas/AGENTS.md; index: ${CANVAS_INDEX_FILE}; assets: canvas/assets.json. Boards: ${JSON.stringify(index.boards.map((board) => ({ ...board, source: canvasBoardPath(board.id) })))}. Documents: ${JSON.stringify(documents.map((document) => ({ id: document.document.id, title: document.document.title, source: canvasDocumentPath(document.document.id), revision: document.revision })))}`,
       "Read relevant boards and Markdown documents for the requested work. A game's main design document guides implementation. Names, descriptions and prompts identify assets; read their local files to inspect actual visuals. Reread current files before editing. Casual conversation needs no canvas reads. An explicit document snapshot in this message is the referenced version.",
     ].join("\n");

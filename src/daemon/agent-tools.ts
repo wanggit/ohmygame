@@ -18,6 +18,8 @@ import { PLAYABLE_PRESET_IDS, PLAYABLE_PRESETS } from "./playable-presets.js";
 import { checkCanvasWorkspace } from "./canvas-check.js";
 import type { CanvasStore } from "./canvas-workspace.js";
 import { readCanvasAssets } from "./canvas-assets.js";
+import { designGateForProject } from "./design-confirmation.js";
+import { designGateBlockReason } from "../shared/design-confirmation.js";
 import { AUDIO_VOICE_ID_MAX_LENGTH, AUDIO_VOICE_ID_PATTERN } from "../shared/audio.js";
 import { inspectPluginDraft } from "./plugin-draft.js";
 
@@ -566,6 +568,8 @@ export function createAgentTools(
     parameters: Type.Object({ boardId: Type.String({ minLength: 1, maxLength: 100 }), nodeId: Type.String({ minLength: 1, maxLength: 120 }) }),
     execute: async (_toolCallId, input, signal) => {
       signal?.throwIfAborted();
+      const blocked = designGateBlockReason(await designGateForProject(project.workspacePath, project.type));
+      if (blocked) throw new Error(blocked);
       const job = await canvasStore.generateNode(project.id, input.boardId, input.nodeId);
       const cancel = () => { void canvasStore.cancel(project.id, job.id).catch(() => {}); };
       signal?.addEventListener("abort", cancel, { once: true });

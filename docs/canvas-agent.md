@@ -144,6 +144,28 @@ Three tools supplement ordinary file editing:
   history, materializes output in the project, and writes the output ID back
   to the node. Changing a file does not start generation.
 
+## Design Confirmation Gate
+
+Game projects (every project type except `asset-canvas`) keep agent media
+production behind a design confirmation. The agent discusses the core loop with
+the user and records the agreed design in the main design document; the user
+then confirms that document (Confirm design on its node). Until the
+confirmation exists, agent media tools (`generate_canvas_media` and the media
+generation tools of the active coding agent) are blocked with guidance instead
+of running.
+
+The confirmation is stored in `canvas/design-confirmation.json` and records the
+document ID and revision it confirmed. Editing the main design document changes
+its revision, which reopens the gate (`awaiting` with reason `stale`); the user
+must confirm again before generation resumes. Projects without a main design
+document keep the gate closed (`no-main-document`), including when the canvas
+workspace cannot be read. `GET`/`POST /projects/:projectId/canvas/design-confirmation`
+exposes the same state and the confirm/reset actions.
+
+The gate governs agent-driven production only. Manual generation from the canvas
+UI, text generation, and ordinary file editing stay available, and `asset-canvas`
+projects report the gate as `not-required`.
+
 ## Migrating Existing Projects
 
 Stop OhMyGame, then run the migration against its data directory:
