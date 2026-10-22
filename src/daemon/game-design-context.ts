@@ -8,7 +8,7 @@ async function designGateLine(project: ProjectState): Promise<string | undefined
   const gate = await designGateForProject(project.workspacePath, project.type);
   if (gate.status === "not-required") return undefined;
   if (gate.status === "confirmed") return `Design gate: the main design is user-confirmed (revision ${gate.revision.slice(0, 8)}). Media generation is allowed.`;
-  const wait = "Media generation tools are blocked until the user confirms the main design document. Discuss and finalize the core loop first, then ask the user to confirm it (Design canvas → Confirm design).";
+  const wait = "Media generation tools are blocked until the user confirms the main design document. Discuss and finalize the core loop first, then tell the user the design is on the Design tab at the top of the workspace and ask them to confirm it (open the Design tab, select the main design document node, Confirm design).";
   if (gate.status === "awaiting") return `Design gate: the main design is ${gate.reason === "stale" ? "edited since the last user confirmation" : "not confirmed by the user yet"}. ${wait}`;
   return `Design gate: this project has no main design document yet. ${wait}`;
 }

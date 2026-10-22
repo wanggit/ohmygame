@@ -1,5 +1,6 @@
 import {
   PROJECT_TYPE_IDS,
+  type PreviewStatus,
   type ProjectState,
   type ProjectType,
 } from "./contracts.js";
@@ -21,6 +22,20 @@ export function supportsWebPreview(
     project?.type === "web-game" ||
     (project?.type === "general" && project.webPreviewEnabled === true)
   );
+}
+
+/**
+ * Design is the landing spot when a Web project opens with no runnable preview and design work
+ * already on the canvas: the preview panel would only show a startup error there. Projects whose
+ * preview can run (including every project with game code) are unaffected.
+ */
+export function shouldOpenDesignByDefault(input: {
+  projectType: ProjectType | undefined;
+  previewStatus: PreviewStatus | undefined;
+  hasDesignContent: boolean;
+}): boolean {
+  if (input.projectType !== "web-game" && input.projectType !== "general") return false;
+  return input.previewStatus === "waiting" && input.hasDesignContent;
 }
 
 export function webPreviewSettingsChanged(

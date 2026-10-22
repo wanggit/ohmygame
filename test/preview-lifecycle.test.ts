@@ -1,4 +1,4 @@
-import { webPreviewSettingsChanged } from "../src/shared/project-runtime.js";
+import { shouldOpenDesignByDefault, webPreviewSettingsChanged } from "../src/shared/project-runtime.js";
 import {
   mkdir,
   mkdtemp,
@@ -579,4 +579,23 @@ it("does not restart when saving equivalent defaults or changing display and pol
   expect(
     webPreviewSettingsChanged(project, { ...project, previewMode: "static" }),
   ).toBe(true);
+});
+
+it("opens Design by default only for Web projects without a runnable preview that already hold design work", () => {
+  const base = { projectType: "web-game" as const, previewStatus: "waiting" as const, hasDesignContent: true };
+  expect(shouldOpenDesignByDefault(base)).toBe(true);
+  // A project whose preview can run (game code exists) keeps Preview as the landing spot.
+  expect(shouldOpenDesignByDefault({ ...base, previewStatus: "stopped" })).toBe(false);
+  expect(shouldOpenDesignByDefault({ ...base, previewStatus: "ready" })).toBe(false);
+  expect(shouldOpenDesignByDefault({ ...base, previewStatus: "starting" })).toBe(false);
+  // A startup failure is a preview to repair, not a design to open.
+  expect(shouldOpenDesignByDefault({ ...base, previewStatus: "error" })).toBe(false);
+  // Nothing on the canvas to show yet.
+  expect(shouldOpenDesignByDefault({ ...base, hasDesignContent: false })).toBe(false);
+  // Other project types have their own landing rules (or no design surface).
+  expect(shouldOpenDesignByDefault({ ...base, projectType: "godot-game" })).toBe(false);
+  expect(shouldOpenDesignByDefault({ ...base, projectType: "asset-canvas" })).toBe(false);
+  expect(shouldOpenDesignByDefault({ ...base, projectType: "interactive-story" })).toBe(false);
+  expect(shouldOpenDesignByDefault({ ...base, projectType: undefined })).toBe(false);
+  expect(shouldOpenDesignByDefault({ ...base, previewStatus: undefined })).toBe(false);
 });

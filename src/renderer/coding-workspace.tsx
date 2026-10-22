@@ -85,6 +85,7 @@ interface CodingWorkspaceProps {
   onAskAgent?: (text: string) => void;
   designOpen?: boolean;
   onDesignOpenChange?: (open: boolean) => void;
+  hasDesignContent?: boolean;
   onDesignSaveReady?: (save: (() => Promise<void>) | undefined) => void;
   onDesignContextChange?: (context: import("../shared/contracts.js").PromptContext | undefined) => void;
   onProjectUpdated?: (project: ProjectState) => void;
@@ -112,6 +113,7 @@ export function CodingWorkspace({
   onAskAgent,
   designOpen = false,
   onDesignOpenChange,
+  hasDesignContent = false,
   onDesignSaveReady,
   onDesignContextChange,
   onProjectUpdated,
@@ -411,6 +413,7 @@ export function CodingWorkspace({
             active={shownTab === "preview"} playerOpen={player.open} suspended={player.suspended} pending={player.pending || player.checking}
             error={player.error} onPlay={playGame} stageRef={previewStage}
             onRetry={() => onRestart()} onSettings={() => setProjectSettingsOpen(true)}
+            onOpenDesign={onDesignOpenChange && hasDesignContent ? () => onDesignOpenChange(true) : undefined}
           />
           </ErrorBoundary>
         </div>
@@ -746,8 +749,8 @@ export function playerViewport(viewport: PreviewViewport, bounds?: { width: numb
   return { width: size(bounds?.width, 1280), height: size(bounds?.height, 720) };
 }
 
-export function PreviewView({ project, client, onAskAgent, onOpenFile, onLogs, reload, revision, url, viewport, active = true, playerOpen = false, suspended = false, pending = false, pausedAfterRecovery = false, error, onPlay, onRetry, onSettings, stageRef }: {
-  client?: string; onAskAgent?: (text: string) => void; onOpenFile?: (path: string) => void; onLogs?: () => void;
+export function PreviewView({ project, client, onAskAgent, onOpenFile, onOpenDesign, onLogs, reload, revision, url, viewport, active = true, playerOpen = false, suspended = false, pending = false, pausedAfterRecovery = false, error, onPlay, onRetry, onSettings, stageRef }: {
+  client?: string; onAskAgent?: (text: string) => void; onOpenFile?: (path: string) => void; onOpenDesign?: () => void; onLogs?: () => void;
   project?: ProjectState; reload: number; revision: number; url?: string; viewport: PreviewViewport;
   active?: boolean; playerOpen?: boolean; suspended?: boolean; pending?: boolean; error?: string; onPlay?: () => void;
   pausedAfterRecovery?: boolean;
@@ -832,11 +835,14 @@ export function PreviewView({ project, client, onAskAgent, onOpenFile, onLogs, r
         <PreviewState status={preview?.status} error={preview?.error} phase={preview?.phase} startedAt={preview?.startedAt} />
         {(pausedAfterRecovery || preview?.stopReason === "recovery") && preview?.status === "stopped" ? <p>{t("workspace.pausedAfterRecovery")}</p> : null}
         {preview?.status === "stopped" && preview.stopReason === "manual" ? <p>{t("workspace.stoppedManual")}</p> : preview?.status === "stopped" && preview.stopReason === "idle" ? <p>{t("workspace.stoppedIdle")}</p> : preview?.status === "stopped" && project?.previewAutoStart === false ? <p>{t("workspace.autoDisabled")}</p> : null}
-        {onRetry && (preview?.status === "error" || preview?.status === "stopped") ? <div className="preview-recovery-actions">
-          <button type="button" disabled={runtime.status !== "ready"} onClick={onRetry}>{preview.status === "stopped" ? t("projectSettings.startPreview") : t("workspace.retryPreview")}</button>
-          {onSettings ? <button type="button" onClick={onSettings}>{t("projectSettings.title")}</button> : null}
-          {onLogs ? <button type="button" onClick={onLogs}>{t("workspace.viewLogs")}</button> : null}
+        {(onRetry && (preview?.status === "error" || preview?.status === "stopped")) || (preview?.error && onOpenDesign) ? <div className="preview-recovery-actions">
+          {onRetry && (preview?.status === "error" || preview?.status === "stopped") ? <>
+            <button type="button" disabled={runtime.status !== "ready"} onClick={onRetry}>{preview.status === "stopped" ? t("projectSettings.startPreview") : t("workspace.retryPreview")}</button>
+            {onSettings ? <button type="button" onClick={onSettings}>{t("projectSettings.title")}</button> : null}
+            {onLogs ? <button type="button" onClick={onLogs}>{t("workspace.viewLogs")}</button> : null}
+          </> : null}
           {preview?.error && onAskAgent ? <button type="button" onClick={() => onAskAgent(previewRepairPrompt(project, preview.error!))}>{t("workspace.askAgent")}</button> : null}
+          {preview?.error && onOpenDesign ? <button type="button" onClick={onOpenDesign}>{t("workspace.openDesign")}</button> : null}
         </div> : null}
       </div> : null}
       {diagnostic ? <div className="preview-diagnostic" role="alert">

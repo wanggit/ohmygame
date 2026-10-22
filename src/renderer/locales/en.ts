@@ -865,6 +865,7 @@ const en = {
     retryPreview: "Retry preview",
     viewLogs: "View logs",
     askAgent: "Ask Agent to fix",
+    openDesign: "Open design canvas",
     compileFailed: "Preview compilation failed",
     runtimeError: "Preview runtime error",
     loadFailed: "Preview could not load",

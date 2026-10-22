@@ -56,7 +56,7 @@ export function designGateState(
 /** Message returned to the agent when a production tool is blocked. */
 export function designGateBlockReason(state: DesignGateState): string | undefined {
   if (state.status === "confirmed" || state.status === "not-required") return undefined;
-  const guidance = "Discuss the core loop with the user and write the main design document, then ask the user to confirm it (Design canvas → Confirm design) before generating any media. Refine the design first; do not work around this gate.";
+  const guidance = "Discuss the core loop with the user and write the main design document, then tell the user the design is on the Design tab at the top of the workspace and ask them to confirm it (open the Design tab, select the main design document node, Confirm design) before generating any media. Refine the design first; do not work around this gate.";
   if (state.status === "no-main-document") return `Design gate: this project has no main design document yet. ${guidance}`;
   return `Design gate: the main design document is ${state.reason === "stale" ? "edited since the last confirmation" : "not confirmed"}. ${guidance}`;
 }

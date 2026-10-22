@@ -21,7 +21,9 @@ import {
 } from "react";
 import type { AgentContextUsage, AgentModel, AgentModelRef, AgentReasoningLevel, CheckpointChangeItem, ConversationCapabilities, ConversationSummary, PendingPrompt, PluginMention, ProjectState, PromptAttachment, PromptContext, PromptImage, PromptMode, PromptReference, ThreadItem } from "../shared/contracts.js";
 import { findAgentModel, preferredAgentModel } from "../shared/agent-models.js";
-import { isWebRuntimeProjectType, supportsWebPreview } from "../shared/project-runtime.js";
+import { isWebRuntimeProjectType, shouldOpenDesignByDefault, supportsWebPreview } from "../shared/project-runtime.js";
+import { designGateRequired } from "../shared/design-confirmation.js";
+import { getDesignConfirmation } from "./canvas-api.js";
 import {
   ApiError,
   acquirePreview,
@@ -174,6 +176,33 @@ export function ProjectShell({
     godotDefaultViewApplied.current = true;
     if (view !== "design" && godotWorkspaceOpen) changeWorkspaceView(true, { replace: true });
   }, [state.project?.id, state.project?.type]);
+
+  // Whether the canvas holds design work (a main design document). Probed so a project whose
+  // preview cannot run can open on Design, and so Preview can point the user there on errors.
+  const [designContentPresent, setDesignContentPresent] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    const project = state.project;
+    if (!project || !designGateRequired(project.type)) { setDesignContentPresent(undefined); return; }
+    let disposed = false;
+    void getDesignConfirmation(project.id)
+      .then((gate) => { if (!disposed) setDesignContentPresent(gate.status === "awaiting" || gate.status === "confirmed"); })
+      .catch(() => { if (!disposed) setDesignContentPresent(undefined); });
+    return () => { disposed = true; };
+  }, [state.project?.id, state.project?.type, workspaceRevision]);
+
+  // A Web project with no runnable preview opens on Design when the canvas holds design work,
+  // since Preview would only show a startup error there. Projects with a runnable preview are
+  // unaffected. The default is decided once, on the first design probe after open, so later
+  // canvas changes never steal a view the user is already reading.
+  const designDefaultViewApplied = useRef(false);
+  useEffect(() => {
+    const project = state.project;
+    if (designDefaultViewApplied.current || !project || designContentPresent === undefined) return;
+    designDefaultViewApplied.current = true;
+    if (shouldOpenDesignByDefault({ projectType: project.type, previewStatus: project.preview.status, hasDesignContent: designContentPresent })) {
+      changeWorkspaceView(true, { replace: true });
+    }
+  }, [state.project, designContentPresent, changeWorkspaceView]);
 
   useEffect(() => {
     const current = state.conversation;
@@ -945,6 +974,7 @@ export function ProjectShell({
           onAskAgent={requestPrompt}
           designOpen={designOpen}
           onDesignOpenChange={changeWorkspaceView}
+          hasDesignContent={designContentPresent}
           onDesignSaveReady={registerDesignSave}
           onDesignContextChange={setDesignContext}
           onProjectUpdated={(updated) => dispatch({ type: "project-updated", project: updated })}

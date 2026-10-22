@@ -846,6 +846,7 @@ const zhCN: typeof en = {
     retryPreview: "重试预览",
     viewLogs: "查看日志",
     askAgent: "让 Agent 修复",
+    openDesign: "打开设计画布",
     compileFailed: "预览编译失败",
     runtimeError: "预览运行出错",
     loadFailed: "预览无法加载",

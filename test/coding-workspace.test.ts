@@ -236,6 +236,40 @@ describe("coding workspace", () => {
     expect(html).toContain('class="coding-workspace-preview-panel"');
     expect(html).toContain('class="preview-frame"');
   });
+
+  it("offers the design canvas from a preview startup error when design content exists", () => {
+    const props = {
+      project: {
+        id: "project-1",
+        name: "Design-only game",
+        type: "web-game" as const,
+        updatedAt: new Date(0).toISOString(),
+        workspacePath: "/tmp/project-1",
+        preview: { status: "waiting" as const, error: "This folder has no package.json dev script that starts a preview server." },
+      },
+      agentBusy: false,
+      publishing: false,
+      workspaceRevision: 0,
+      onPublish: async () => false,
+      onRestart: () => undefined,
+      onOpenPublish: () => undefined,
+      onClosePublish: () => undefined,
+      onDesignOpenChange: () => undefined,
+    };
+
+    const withDesign = renderToStaticMarkup(createElement(CodingWorkspace, { ...props, hasDesignContent: true }));
+    expect(withDesign).toContain("This folder has no package.json dev script");
+    expect(withDesign).toContain("Open design canvas");
+
+    // Without design content the error stands alone: there is nothing on the canvas to open.
+    const withoutDesign = renderToStaticMarkup(createElement(CodingWorkspace, { ...props, hasDesignContent: false }));
+    expect(withoutDesign).toContain("This folder has no package.json dev script");
+    expect(withoutDesign).not.toContain("Open design canvas");
+
+    // Without a Design tab there is nowhere to go.
+    const withoutDesignTab = renderToStaticMarkup(createElement(CodingWorkspace, { ...props, hasDesignContent: true, onDesignOpenChange: undefined }));
+    expect(withoutDesignTab).not.toContain("Open design canvas");
+  });
 });
 
 describe("preview path", () => {
