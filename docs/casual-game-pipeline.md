@@ -144,7 +144,7 @@ avg session / 完局率 / rewarded 展示与转化 / revenue per 1000 plays /
 | ID | 任务 | 产出 | 验收标准 | 状态 |
 | --- | --- | --- | --- | --- |
 | T1 | 执行包文档与选题清单 | 本文件 + `config/casual-game-topics.json` | 内容与讨论定稿一致；JSON 可解析 | ✅ |
-| T2 | A1《Juice Sort》全链路跑通 | `~/projects/casual-games/juice-sort/` | 满足全部 DoD；itch.io 可玩链接；Playgama sandbox 提交；Bridge 接入 | 🔄 质量线修复版完成（build/verify/headless 截图验收通过），待人工浏览器手感验收与门户提交 |
+| T2 | A1《Juice Sort》全链路跑通 | `~/projects/casual-games/juice-sort/` | 满足全部 DoD；itch.io 可玩链接；Playgama sandbox 提交；Bridge 接入 | ✅ 模板核心完成（七轮实测打磨：交互/动画/粒子/音效/图层/难度/特殊管），待门户提交 |
 | T3 | 轻量合集站骨架 | `~/projects/casual-site/` | Cloudflare Pages 可部署；落地页模板（游戏 iframe + 截图 + 英文文案）；umami 埋点接入 | ⬜ |
 | T4 | 数据记录与归档结构 | `~/projects/casual-site/data/` 或表格模板 | 每款一记录；含拒绝理由原文归档字段；第 8 周可出批次汇总 | ⬜ |
 | T5 | Playgama MCP 接线 | OhMyGame MCP 配置 | agent 可经 MCP 创建游戏/上传构建/发 sandbox | ⬜ |
@@ -173,7 +173,24 @@ avg session / 完局率 / rewarded 展示与转化 / revenue per 1000 plays /
 游戏技术栈约定：**Vite + TypeScript + Phaser 3**（与 OhMyGame Web Game 默认一致，
 便于日后用 OhMyGame agent 迭代这些项目；D 组小游戏允许退化为纯 Canvas）。
 
-## 七、资产管线实测结论（2026-10-25，A1 重制时验证）
+## 七、A1 模板资产清单（2026-10-25 定稿，判定可用）
+
+A1《Juice Sort》经七轮实测迭代（点击/动画/粒子/音效/图层/难度曲线/特殊管）后判定模板可用。
+**分层资产（换皮变奏的复用边界）**：
+
+| 层 | 资产 | A2/A3 复用方式 |
+| --- | --- | --- |
+| 横切基建 | Playgama Bridge 集成（含 initialize/storage 挂起三坑修复）、自写粒子池、音画同步模式、统一最近管输入、动态图层、`?step/?win/?anim/?stream` 自测模式、headless 截图验收、verify 脚手架 | 原样复制 |
+| 玩法核 | 水排序规则（Level/Solver）、可解性验证生成器、星级系统 | 原样复制 |
+| 难度模型 | `DIFFICULTY`（颜色/空管/目标步数/特殊管/星级阈值）+ 生成期可解性验证（锁管排除法、冰管冻结源法） | 原样继承，数值可按数据调 |
+| 主题层 | `config.ts`（配色/文案）+ 背景/装饰绘制 | **换皮改动的主要位置** |
+
+**模板边界（诚实记录）**：美术上限为精细扁平卡通（AI 图片生成通道仍待 MCP env 修复）；
+难度后段进入平台期（水排序机制上限）；DFS 解长仅作 par 近似非精确最优。
+
+**未实现机制（路线图）**：短管（容量）、标签管（目标色）、钥匙+盒子组合、限步模式。
+
+## 八、资产管线实测结论（2026-10-25，A1 重制时验证）
 
 | 通道 | 状态 | 结论 |
 | --- | --- | --- |
