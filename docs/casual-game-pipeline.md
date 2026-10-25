@@ -144,7 +144,7 @@ avg session / 完局率 / rewarded 展示与转化 / revenue per 1000 plays /
 | ID | 任务 | 产出 | 验收标准 | 状态 |
 | --- | --- | --- | --- | --- |
 | T1 | 执行包文档与选题清单 | 本文件 + `config/casual-game-topics.json` | 内容与讨论定稿一致；JSON 可解析 | ✅ |
-| T2 | A1《Juice Sort》全链路跑通 | `~/projects/casual-games/juice-sort/` | 满足全部 DoD；itch.io 可玩链接；Playgama sandbox 提交；Bridge 接入 | 🚧 代码完成（build + 验证脚本通过），待 itch.io / Playgama 人工提交 |
+| T2 | A1《Juice Sort》全链路跑通 | `~/projects/casual-games/juice-sort/` | 满足全部 DoD；itch.io 可玩链接；Playgama sandbox 提交；Bridge 接入 | 🔄 质量线修复版完成（build/verify/headless 截图验收通过），待人工浏览器手感验收与门户提交 |
 | T3 | 轻量合集站骨架 | `~/projects/casual-site/` | Cloudflare Pages 可部署；落地页模板（游戏 iframe + 截图 + 英文文案）；umami 埋点接入 | ⬜ |
 | T4 | 数据记录与归档结构 | `~/projects/casual-site/data/` 或表格模板 | 每款一记录；含拒绝理由原文归档字段；第 8 周可出批次汇总 | ⬜ |
 | T5 | Playgama MCP 接线 | OhMyGame MCP 配置 | agent 可经 MCP 创建游戏/上传构建/发 sandbox | ⬜ |
@@ -173,7 +173,22 @@ avg session / 完局率 / rewarded 展示与转化 / revenue per 1000 plays /
 游戏技术栈约定：**Vite + TypeScript + Phaser 3**（与 OhMyGame Web Game 默认一致，
 便于日后用 OhMyGame agent 迭代这些项目；D 组小游戏允许退化为纯 Canvas）。
 
-## 七、风险备忘
+## 七、资产管线实测结论（2026-10-25，A1 重制时验证）
+
+| 通道 | 状态 | 结论 |
+| --- | --- | --- |
+| AI 图片生成（bailian MCP） | ❌ 不可用 | MCP 进程未继承 `BAI_LIAN_TOKEN_PLAN_KEY`（shell `.zshrc` 有配但 IDE 启动的 MCP server 没带上）。**修复 MCP env 配置后重测**，这是资产管线的关键一环 |
+| CC0 素材库检索（game-assets MCP） | ⚠️ 受限 | Kenney 目录抓取返回空、Openverse 多为实拍照片（风格不搭）。音效通道（freesound/opengameart CC0）良好：倒水/点击/胜利三件套已进项目 |
+| 精细化代码绘制 | ✅ 主力 | 扁平卡通风（遮阳棚/玻璃管/液体渐变/气泡高光/木桌）质量可控、体积最小，当前基线 |
+| Chrome headless 截图验收 | ✅ 可用 | `?step=N` / `?win=1` 自测模式 + headless 截图，实现了"浏览器实测"的自动化闭环（布局/状态/面板可视验收） |
+
+**Bridge 集成的三个坑（已修复，量产模板必须带上）**：
+1. npm 引入必须配 `@playgama/bridge/vite` 插件（否则 runtime 不加载）；
+2. `bridge.initialize()` 在无平台适配器时可能**永不 resolve**，必须加超时（1.5s）；
+3. `bridge.storage.get/set` 同样可能挂起，必须加超时（1.2s）+ localStorage 兜底；
+   否则游戏启动流程被挂起，整屏空白。
+
+## 八、风险备忘
 
 1. 质量线是护身符：宁可少上不上烂的，门户对低质有隐性降权。
 2. GameDistribution QA 最长 3 周且更新重审 2 周，快速试错走 Playgama；
