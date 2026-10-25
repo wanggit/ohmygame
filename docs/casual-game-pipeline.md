@@ -149,7 +149,7 @@ avg session / 完局率 / rewarded 展示与转化 / revenue per 1000 plays /
 | T4 | 数据记录与归档结构 | `~/projects/casual-site/data/` 或表格模板 | 每款一记录；含拒绝理由原文归档字段；第 8 周可出批次汇总 | ⬜ |
 | T5 | Playgama MCP 接线 | OhMyGame MCP 配置 | agent 可经 MCP 创建游戏/上传构建/发 sandbox | ⬜ |
 | T6 | A2《Potion Sort》与 A3《Gem Sort》 | 2 个游戏项目 | 复用 A1 底座；各自满足 DoD | 🔄 **A2 ✅ 完成**（`casual-games/potion-sort/`，换皮成本约 40 分钟含工具沉淀；100 关可解 + 全断言 + console 零错误 + 截图验收）。**渠道修正**：Playgama"同开发者不得重复游戏"条款 → 换皮款走 itch.io + 自建站矩阵，胜出者"图形+机制完全重设计"后再冲门户。A3 视数据再定 |
-| T7 | B 组 3 款（Merge/2048 类） | 3 个游戏项目 | 满足 DoD | ⬜ |
+| T7 | B 组 3 款（Merge/2048 类） | 3 个游戏项目 | 满足 DoD | 🔄 **B1 ✅ 可玩原型**（`casual-games/fruit-merge/`，2048 核心 + 果园美术 + 水果链 🍒→🏆 + 合并动画/果汁粒子 + 22 项断言 + console 零错误 + 中盘截图验收）。新玩法核无 solver/关卡生成负担，成本低于 A2 玩法变奏 |
 | T8 | C 组 2 款（Idle 类） | 2 个游戏项目 | 满足 DoD | ⬜ |
 | T9 | D 组 2 款（One-tap 类） | 2 个游戏项目 | 满足 DoD | ⬜ |
 | T10 | 游戏模板基座沉淀 | Bridge 集成 + 通用结构抽象 | 新款脚手架 ≤ 1 小时可跑通 DoD 骨架 | ⬜ |

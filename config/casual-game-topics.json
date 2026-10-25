@@ -11,11 +11,29 @@
     }
   },
   "channels": {
-    "itch": { "role": "hosting", "review": "none" },
-    "playgama": { "role": "data", "review": "24h", "revenueShare": "70-90% partner / 50% own" },
-    "gamedistribution": { "role": "data", "review": "up to 3 weeks", "revenueShare": "33% net" },
-    "crazygames": { "role": "optimization-target", "review": "QA", "note": "use QA feedback as quality calibration first" },
-    "poki": { "role": "milestone-only", "note": "testing funnel + AI policy; not a batch channel" }
+    "itch": {
+      "role": "hosting",
+      "review": "none"
+    },
+    "playgama": {
+      "role": "data",
+      "review": "24h",
+      "revenueShare": "70-90% partner / 50% own"
+    },
+    "gamedistribution": {
+      "role": "data",
+      "review": "up to 3 weeks",
+      "revenueShare": "33% net"
+    },
+    "crazygames": {
+      "role": "optimization-target",
+      "review": "QA",
+      "note": "use QA feedback as quality calibration first"
+    },
+    "poki": {
+      "role": "milestone-only",
+      "note": "testing funnel + AI policy; not a batch channel"
+    }
   },
   "stack": {
     "engine": "phaser3",
@@ -32,9 +50,18 @@
       "theme": "fruit-juice",
       "title": "Juice Sort: Color Water Puzzle",
       "genre": "puzzle",
-      "tags": ["water sort", "color sort", "juice", "puzzle", "casual"],
+      "tags": [
+        "water sort",
+        "color sort",
+        "juice",
+        "puzzle",
+        "casual"
+      ],
       "description": "Pour and sort colorful fruit juices into matching glasses. Relaxing one-tap color sorting puzzles.",
-      "monetization": { "rewarded": "hint (auto-pour one step)", "interstitial": "every 5 levels" },
+      "monetization": {
+        "rewarded": "hint (auto-pour one step)",
+        "interstitial": "every 5 levels"
+      },
       "projectPath": "~/projects/casual-games/juice-sort",
       "status": "planned"
     },
@@ -44,11 +71,20 @@
       "theme": "potion-lab",
       "title": "Potion Sort: Magic Lab Puzzle",
       "genre": "puzzle",
-      "tags": ["water sort", "potion", "magic", "puzzle", "casual"],
+      "tags": [
+        "water sort",
+        "potion",
+        "magic",
+        "puzzle",
+        "casual"
+      ],
       "description": "Mix and sort magical potions in your alchemy lab. A relaxing color sorting challenge.",
-      "monetization": { "rewarded": "hint (auto-pour one step)", "interstitial": "every 5 levels" },
+      "monetization": {
+        "rewarded": "hint (auto-pour one step)",
+        "interstitial": "every 5 levels"
+      },
       "projectPath": "~/projects/casual-games/potion-sort",
-      "status": "planned"
+      "status": "done"
     },
     {
       "id": "A3",
@@ -56,9 +92,18 @@
       "theme": "gem-magic",
       "title": "Gem Sort: Crystal Water Puzzle",
       "genre": "puzzle",
-      "tags": ["water sort", "gems", "crystal", "puzzle", "casual"],
+      "tags": [
+        "water sort",
+        "gems",
+        "crystal",
+        "puzzle",
+        "casual"
+      ],
       "description": "Sort sparkling crystal liquids by color. Satisfying puzzles with a magical gem theme.",
-      "monetization": { "rewarded": "hint (auto-pour one step)", "interstitial": "every 5 levels" },
+      "monetization": {
+        "rewarded": "hint (auto-pour one step)",
+        "interstitial": "every 5 levels"
+      },
       "projectPath": "~/projects/casual-games/gem-sort",
       "status": "planned"
     },
@@ -68,11 +113,20 @@
       "theme": "fruit-merge",
       "title": "Fruit Merge: 2048 Harvest",
       "genre": "puzzle",
-      "tags": ["merge", "2048", "fruit", "puzzle", "casual"],
+      "tags": [
+        "merge",
+        "2048",
+        "fruit",
+        "puzzle",
+        "casual"
+      ],
       "description": "Merge identical fruits and harvest your way to the golden crop. A juicy twist on 2048.",
-      "monetization": { "rewarded": "undo / board boost", "interstitial": "every 3 minutes" },
+      "monetization": {
+        "rewarded": "undo / board boost",
+        "interstitial": "every 3 minutes"
+      },
       "projectPath": "~/projects/casual-games/fruit-merge",
-      "status": "planned"
+      "status": "prototype-done"
     },
     {
       "id": "B2",
@@ -80,9 +134,18 @@
       "theme": "monster-evolution",
       "title": "Monster Merge: Evolution 2048",
       "genre": "puzzle",
-      "tags": ["merge", "2048", "monster", "evolution", "casual"],
+      "tags": [
+        "merge",
+        "2048",
+        "monster",
+        "evolution",
+        "casual"
+      ],
       "description": "Merge tiny monsters into mighty legends. Cute creatures, simple rules, endless evolution.",
-      "monetization": { "rewarded": "undo / board boost", "interstitial": "every 3 minutes" },
+      "monetization": {
+        "rewarded": "undo / board boost",
+        "interstitial": "every 3 minutes"
+      },
       "projectPath": "~/projects/casual-games/monster-merge",
       "status": "planned"
     },
@@ -92,9 +155,18 @@
       "theme": "number-space",
       "title": "Star 2048: Number Galaxy",
       "genre": "puzzle",
-      "tags": ["2048", "numbers", "space", "puzzle", "casual"],
+      "tags": [
+        "2048",
+        "numbers",
+        "space",
+        "puzzle",
+        "casual"
+      ],
       "description": "Slide and merge number blocks across a glowing galaxy. The classic 2048 with cosmic style.",
-      "monetization": { "rewarded": "undo / board boost", "interstitial": "every 3 minutes" },
+      "monetization": {
+        "rewarded": "undo / board boost",
+        "interstitial": "every 3 minutes"
+      },
       "projectPath": "~/projects/casual-games/star-2048",
       "status": "planned"
     },
@@ -104,9 +176,18 @@
       "theme": "cafe",
       "title": "Idle Coffee Shop",
       "genre": "idle",
-      "tags": ["idle", "clicker", "cafe", "tycoon", "casual"],
+      "tags": [
+        "idle",
+        "clicker",
+        "cafe",
+        "tycoon",
+        "casual"
+      ],
       "description": "Brew, serve, and grow your cozy coffee shop empire. Tap to earn, upgrade to grow, idle to relax.",
-      "monetization": { "rewarded": "offline earnings x2", "interstitial": "natural pause points" },
+      "monetization": {
+        "rewarded": "offline earnings x2",
+        "interstitial": "natural pause points"
+      },
       "projectPath": "~/projects/casual-games/idle-coffee",
       "status": "planned"
     },
@@ -116,9 +197,18 @@
       "theme": "space-station",
       "title": "Idle Space Station",
       "genre": "idle",
-      "tags": ["idle", "clicker", "space", "tycoon", "casual"],
+      "tags": [
+        "idle",
+        "clicker",
+        "space",
+        "tycoon",
+        "casual"
+      ],
       "description": "Build and upgrade your own space station among the stars. Idle income that is out of this world.",
-      "monetization": { "rewarded": "offline earnings x2", "interstitial": "natural pause points" },
+      "monetization": {
+        "rewarded": "offline earnings x2",
+        "interstitial": "natural pause points"
+      },
       "projectPath": "~/projects/casual-games/idle-space",
       "status": "planned"
     },
@@ -128,9 +218,18 @@
       "theme": "asmr-slice",
       "title": "Satisfying Slice: ASMR Cutter",
       "genre": "hypercasual",
-      "tags": ["asmr", "satisfying", "slice", "hypercasual", "casual"],
+      "tags": [
+        "asmr",
+        "satisfying",
+        "slice",
+        "hypercasual",
+        "casual"
+      ],
       "description": "One tap, perfect slices. Satisfying ASMR cutting with smooth physics and juicy visuals.",
-      "monetization": { "rewarded": "revive / perfect bonus", "interstitial": "end of each run" },
+      "monetization": {
+        "rewarded": "revive / perfect bonus",
+        "interstitial": "end of each run"
+      },
       "projectPath": "~/projects/casual-games/satisfying-slice",
       "status": "planned"
     },
@@ -140,9 +239,17 @@
       "theme": "stack-balance",
       "title": "Tower Balance: Stack It!",
       "genre": "hypercasual",
-      "tags": ["stack", "balance", "hypercasual", "casual"],
+      "tags": [
+        "stack",
+        "balance",
+        "hypercasual",
+        "casual"
+      ],
       "description": "Tap to drop, stack to the sky. Simple to play, tricky to master. How high can you build?",
-      "monetization": { "rewarded": "revive / perfect bonus", "interstitial": "end of each run" },
+      "monetization": {
+        "rewarded": "revive / perfect bonus",
+        "interstitial": "end of each run"
+      },
       "projectPath": "~/projects/casual-games/tower-balance",
       "status": "planned"
     }
