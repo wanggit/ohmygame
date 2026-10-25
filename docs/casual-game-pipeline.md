@@ -144,7 +144,7 @@ avg session / 完局率 / rewarded 展示与转化 / revenue per 1000 plays /
 | ID | 任务 | 产出 | 验收标准 | 状态 |
 | --- | --- | --- | --- | --- |
 | T1 | 执行包文档与选题清单 | 本文件 + `config/casual-game-topics.json` | 内容与讨论定稿一致；JSON 可解析 | ✅ |
-| T2 | A1《Juice Sort》全链路跑通 | `~/projects/casual-games/juice-sort/` | 满足全部 DoD；itch.io 可玩链接；Playgama sandbox 提交；Bridge CDN 接入 | ⬜ |
+| T2 | A1《Juice Sort》全链路跑通 | `~/projects/casual-games/juice-sort/` | 满足全部 DoD；itch.io 可玩链接；Playgama sandbox 提交；Bridge 接入 | 🚧 代码完成（build + 验证脚本通过），待 itch.io / Playgama 人工提交 |
 | T3 | 轻量合集站骨架 | `~/projects/casual-site/` | Cloudflare Pages 可部署；落地页模板（游戏 iframe + 截图 + 英文文案）；umami 埋点接入 | ⬜ |
 | T4 | 数据记录与归档结构 | `~/projects/casual-site/data/` 或表格模板 | 每款一记录；含拒绝理由原文归档字段；第 8 周可出批次汇总 | ⬜ |
 | T5 | Playgama MCP 接线 | OhMyGame MCP 配置 | agent 可经 MCP 创建游戏/上传构建/发 sandbox | ⬜ |
