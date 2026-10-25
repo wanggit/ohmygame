@@ -11,7 +11,7 @@ The daemon owns credentials, provider calls, generated files, and Library regist
 
 ## Architecture
 
-`src/shared/audio.ts` defines requests, output settings, model capabilities, catalogs, and generated-audio metadata. A provider adapter implements `AudioProviderAdapter`; `ProviderAudio` selects only a configured, enabled model that advertises the requested operation. `ToolRunner` then persists MP3 or WAV output through the same job and Library flow used by image, video, and 3D generation.
+`src/shared/audio.ts` defines requests, output settings, model capabilities, catalogs, and generated-audio metadata. A provider adapter implements `AudioProviderAdapter`; `ProviderAudio` selects only a configured, enabled model that advertises the requested operation. `ToolRunner` then persists MP3, WAV, or FLAC output through the same job and Library flow used by image, video, and 3D generation.
 
 The stable tool boundary is:
 
@@ -19,7 +19,7 @@ The stable tool boundary is:
 | ----------------------- | -------------- | ------------------------------------------ |
 | `generate-speech`       | `speech`       | Volcengine Doubao Speech synthesis 2.0     |
 | `generate-sound-effect` | `sound-effect` | Volcengine Doubao Seed Audio 1.0            |
-| `generate-music`        | `music`        | Volcengine Doubao Seed Audio 1.0            |
+| `generate-music`        | `music`        | Volcengine Doubao Seed Audio 1.0, Custom Music API |
 
 Unsupported operations fail before an incompatible provider is called. Adding ElevenLabs, MiniMax, Suno, Gemini, Fish Audio, or SiliconFlow should normally require a new adapter and settings integration, not changes to jobs or Library storage.
 
@@ -27,7 +27,7 @@ Unsupported operations fail before an incompatible provider is called. Adding El
 
 Asset Canvas exposes the common layer as three generation node types: **Speech**, **Sound effect**, and **Music**. The Add menu shows a type only when the live audio catalog contains a configured, enabled model for that operation, and each existing node filters the same catalog by its required operation. A speech-only model therefore cannot be selected for music or effects. A Text or Document node can be connected as a prompt source; its current content is combined with the node's local text when the job starts.
 
-Speech nodes store provider-neutral model, speaker, and speed settings. Sound-effect and music nodes store provider-neutral prompt, duration, and loop settings, plus capability-gated options such as negative prompts, lyrics, and instrumental mode. Generated MP3 or WAV output is registered in the Library, written back to the node as an `assetId`, and playable in both generation nodes and Library asset nodes. Model and option selections are remembered independently for each node type.
+Speech nodes store provider-neutral model, speaker, and speed settings. Sound-effect and music nodes store provider-neutral prompt, duration, and loop settings, plus capability-gated options such as negative prompts, lyrics, and instrumental mode. Generated MP3, WAV, or FLAC output is registered in the Library, written back to the node as an `assetId`, and playable in both generation nodes and Library asset nodes. Model and option selections are remembered independently for each node type.
 
 Existing nodes remain readable when a provider is disconnected, but generation stays disabled until a compatible model is available. Installing a future adapter that advertises sound-effect or music activates the existing node contract and adds that node type to the menu without another canvas schema change. Agent generation tools follow the same live capability filter, so unsupported operations are not offered on a turn.
 
@@ -100,6 +100,32 @@ Example music job body:
 ```
 
 The model can be omitted to use the configured compatible model, or supplied explicitly as `{ "provider": "volcengine-seed-audio", "id": "seed-audio-1.0" }`.
+
+## Custom Music API
+
+The music adapter targets OpenAI-compatible gateway endpoints that expose `POST {base}/music/generations`, such as FreeAiProxy in front of the wenxin web music service. Configure it in **Settings → Providers & Models → Custom Music API**: a Base URL (required, ending in `/v1`), an optional Bearer API key, an optional model ID (defaults to `wenxin-music`), and optional default `style` and `voice` values. Settings live in `custom-music.json`; the key is never returned by a settings or catalog endpoint (`hasApiKey` only reports whether one is stored).
+
+Each generation returns one song with vocals as FLAC. FreeAiProxy's `doubao-music` model is not supported: it returns an MP4 with a cover image plus the audio track, while this adapter and the audio Library store audio files only (the provider reports that container explicitly). Use `wenxin-music` or another model that returns an audio file. The model advertises `vocalsOnly`, so Asset Canvas keeps the instrumental option off and shows the lyrics field instead; providing `lyrics` switches the request into custom-lyrics mode, and without it the provider writes lyrics from the prompt. A requested duration is passed along as a prompt hint only. Loops, reference audio, non-FLAC output, and sample-rate or channel selection are rejected at the daemon boundary rather than being silently ignored: this gateway family returns FLAC regardless of the requested format, and the downloaded bytes are validated by magic number (with duration, sample rate, and channels read from the FLAC STREAMINFO block) before entering the normal job and Library flow. `style` and `voice` are free text here because other gateways may use different vocabularies; an invalid value comes back as a mapped provider error.
+
+The daemon endpoints are:
+
+- `GET /settings/models/providers/custom-music` — saved connection state without the key;
+- `PUT /settings/models/providers/custom-music` — partial update: string values are saved, `null` clears a field, and omitted keys keep their stored value (so saving without an API key keeps the current one);
+- `DELETE /settings/models/providers/custom-music` — remove the Custom Music connection;
+- `POST /tools/generate-music/jobs` — enqueue music generation.
+
+Example music job body:
+
+```json
+{
+  "prompt": "热血的 Boss 战主题曲，太鼓与电吉他",
+  "instrumental": false,
+  "lyrics": "[Verse]\nWe rise again",
+  "durationSeconds": 30
+}
+```
+
+The model can be omitted to use the configured compatible model, or supplied explicitly as `{ "provider": "custom-music", "id": "wenxin-music" }`.
 
 ## Adding another provider
 

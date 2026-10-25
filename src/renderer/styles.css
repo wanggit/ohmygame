@@ -1208,6 +1208,19 @@ body {
 .settings-checkbox-row small { color: var(--text-secondary); font-size: 11px; line-height: 16px; }
 .settings-checkbox-row input:disabled { cursor: not-allowed; }
 .settings-custom-search-section { margin-top: 2px; }
+.settings-agent-learnings-intro { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 18px; }
+.settings-agent-learnings > .settings-search-section + .settings-search-section { padding-top: 20px; border-top: 1px solid var(--border); }
+.agent-learnings-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.agent-learnings-item { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 16px; padding: 12px 2px; border-top: 1px solid var(--border); }
+.agent-learnings-item:first-child { border-top: 0; }
+.agent-learnings-text { display: grid; flex: 1; gap: 3px; min-width: 0; color: var(--text); font-size: 13px; line-height: 19px; overflow-wrap: anywhere; }
+.agent-learnings-text small { color: var(--text-secondary); font-size: 11px; line-height: 16px; }
+.agent-learnings-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
+.agent-learnings-actions .settings-secondary-button { min-width: 0; padding: 0 10px; }
+.agent-learnings-edit { display: grid; flex: 1; gap: 10px; min-width: 0; }
+.agent-learnings-add { display: flex; align-items: center; gap: 8px; }
+.agent-learnings-add .settings-search-input { flex: 1; }
+.settings-agent-learnings-empty { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 18px; }
 
 .settings-primary-button,
 .settings-secondary-button {

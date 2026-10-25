@@ -111,9 +111,17 @@ export interface CustomImageModelSettings {
   aspectRatios: ImageAspectRatio[];
   maxReferenceImages: number;
   maxOutputs: ImageOutputCount;
+  /**
+   * How OpenAI Images requests spell the size parameter: fixed pixel sizes
+   * ("1024x1024", the OpenAI default) or aspect ratios ("1:1") as used by
+   * gateways such as FreeAiProxy. Other protocols derive their own formats.
+   */
+  sizeFormat?: ImageSizeFormat;
 }
 
-export type VideoProtocol = "openrouter-videos" | "seedance";
+export type ImageSizeFormat = "pixel" | "aspect-ratio";
+
+export type VideoProtocol = "openrouter-videos" | "seedance" | "openai-videos";
 export interface CustomVideoModelSettings {
   protocol: VideoProtocol;
   baseUrl?: string;
@@ -343,6 +351,8 @@ export interface ImageModel extends ImageModelRef {
   protocol: ImageProtocol | "codex-cli";
   supportsResolution?: boolean;
   supportsAspectRatio?: boolean;
+  /** OpenAI Images only: pixel sizes (default) or aspect-ratio strings for the size parameter. */
+  sizeFormat?: ImageSizeFormat;
 }
 
 export type ImageProtocol = "openai-images" | "gemini-generate-content" | "openrouter-images" | "volcengine-images";
@@ -1009,7 +1019,8 @@ export type LibraryUploadMediaType =
   | "video/quicktime"
   | "video/webm"
   | "audio/mpeg"
-  | "audio/wav";
+  | "audio/wav"
+  | "audio/flac";
 
 export interface CreateLibraryImageRequest {
   name: string;

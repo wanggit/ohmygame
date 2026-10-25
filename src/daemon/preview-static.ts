@@ -20,6 +20,7 @@ const MIME: Record<string, string> = {
   ".mp3": "audio/mpeg",
   ".ogg": "audio/ogg",
   ".wav": "audio/wav",
+  ".flac": "audio/flac",
   ".mp4": "video/mp4",
   ".webm": "video/webm",
   ".txt": "text/plain; charset=utf-8",

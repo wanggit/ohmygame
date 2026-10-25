@@ -179,5 +179,6 @@ function libraryUploadMediaType(file: File): LibraryUploadMediaType | undefined 
   if (extension === "webm") return "video/webm";
   if (extension === "mp3") return "audio/mpeg";
   if (extension === "wav") return "audio/wav";
+  if (extension === "flac") return "audio/flac";
   return undefined;
 }

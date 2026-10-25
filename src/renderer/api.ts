@@ -89,6 +89,7 @@ import type { UpdateWebSearchSettings, WebSearchSettings } from "../shared/web-s
 import type { DesktopClipboardFile } from "../shared/file-transfer.js";
 import type { WebGamePlayerBridge } from "../shared/web-game-player.js";
 import type { NetworkConnectionTest, NetworkSettings, NetworkSettingsState } from "../shared/network-settings.js";
+import type { AgentLearnings } from "../shared/agent-learnings.js";
 import { composerDrafts } from "./composer-drafts.js";
 import type { OnboardingState, UpdateOnboardingRequest } from "../shared/onboarding.js";
 import { t } from "./i18n.js";
@@ -433,6 +434,36 @@ export async function updateVolcengineSeedAudioApiKey(apiKey: string): Promise<{
   return result;
 }
 
+export interface CustomMusicSettings {
+  configured: boolean;
+  hasApiKey?: boolean;
+  baseUrl?: string;
+  model?: string;
+  style?: string;
+  voice?: string;
+}
+
+export interface CustomMusicSettingsUpdate {
+  baseUrl?: string | null;
+  apiKey?: string | null;
+  model?: string | null;
+  style?: string | null;
+  voice?: string | null;
+}
+
+export async function getCustomMusicSettings(): Promise<CustomMusicSettings> {
+  return request("/settings/models/providers/custom-music");
+}
+
+export async function updateCustomMusicSettings(update: CustomMusicSettingsUpdate): Promise<CustomMusicSettings> {
+  const result = await request<CustomMusicSettings>("/settings/models/providers/custom-music", {
+    method: "PUT",
+    body: JSON.stringify(update),
+  });
+  notifyAgentModelsChanged();
+  return result;
+}
+
 export async function saveVolcengineTtsDefaultVoiceId(defaultVoiceId: string | null): Promise<{ configured: boolean; defaultVoiceId?: string }> {
   return request<{ configured: boolean; defaultVoiceId?: string }>("/settings/models/providers/volcengine-tts", {
     method: "PUT",
@@ -538,6 +569,26 @@ export async function getWebSearchSettings(): Promise<WebSearchSettings> {
 
 export async function updateWebSearchSettings(input: UpdateWebSearchSettings): Promise<WebSearchSettings> {
   return request("/settings/web-search", { method: "PUT", body: JSON.stringify(input) });
+}
+
+export async function getAgentLearnings(): Promise<AgentLearnings> {
+  return request("/agent-learnings");
+}
+
+export async function addAgentPreference(text: string): Promise<AgentLearnings> {
+  return request("/agent-learnings/preferences", { method: "POST", body: JSON.stringify({ text }) });
+}
+
+export async function updateAgentPreference(id: string, text: string): Promise<AgentLearnings> {
+  return request(`/agent-learnings/preferences/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ text }) });
+}
+
+export async function deleteAgentPreference(id: string): Promise<AgentLearnings> {
+  return request(`/agent-learnings/preferences/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function deleteAgentSkill(name: string): Promise<AgentLearnings> {
+  return request(`/agent-learnings/skills/${encodeURIComponent(name)}`, { method: "DELETE" });
 }
 
 export async function listExploreGames(accessToken?: string, options: CommunityGamesQuery = {}): Promise<CommunityGame[]> {

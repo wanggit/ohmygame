@@ -58,5 +58,6 @@ const DOWNLOAD_EXTENSIONS: Record<string, string> = {
   "video/webm": "webm",
   "audio/mpeg": "mp3",
   "audio/wav": "wav",
+  "audio/flac": "flac",
   "model/gltf-binary": "glb",
 };

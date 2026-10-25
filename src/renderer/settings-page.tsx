@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { ArrowLeft, Bot, Check, ExternalLink, Globe2, InfoCircle, Package, Palette, Plug, Server, UserRound, Wifi } from "./icons.js";
+import { ArrowLeft, Bot, Check, ExternalLink, Globe2, InfoCircle, Lightbulb, Package, Palette, Plug, Server, UserRound, Wifi } from "./icons.js";
 import { useAuth } from "./auth.js";
 import { readSidebarWidth } from "./app-sidebar.js";
 import { ModelsSettings, type ModelsView } from "./models-settings.js";
 import { AgentsSettings, type AgentsView } from "./agents-settings.js";
+import { AgentLearningsSettings } from "./agent-learnings-settings.js";
 import type { SettingsSection } from "./routes.js";
 import { UserAvatar } from "./user-avatar.js";
 import { WindowDragRegion } from "./window-drag-region.js";
@@ -34,6 +35,7 @@ const LANGUAGE_OPTIONS: readonly { value: LanguagePreference; label: string }[] 
 const SETTINGS_SECTIONS: Array<{ section: SettingsSection; label: string; icon: typeof UserRound }> = [
   { section: "providers", label: t("settings.nav.providers"), icon: Server },
   { section: "agents", label: t("settings.nav.agents"), icon: Bot },
+  { section: "learnings", label: t("settings.nav.learnings"), icon: Lightbulb },
   { section: "account", label: t("settings.nav.account"), icon: UserRound },
   { section: "appearance", label: t("settings.nav.appearance"), icon: Palette },
   { section: "web-search", label: t("settings.nav.webSearch"), icon: Globe2 },
@@ -98,6 +100,7 @@ export function SettingsPage({ section, pluginId, onBack, onSectionChange, onPlu
           {section === "appearance" ? <AppearanceSettings /> : null}
           {section === "providers" ? <ModelsSettings view={modelsView} onViewChange={setModelsView} onOpenAgents={() => chooseSection("agents")} /> : null}
           {section === "agents" ? <AgentsSettings view={agentsView} onViewChange={setAgentsView} onOpenProviders={() => chooseSection("providers")} /> : null}
+          {section === "learnings" ? <AgentLearningsSettings /> : null}
           {section === "web-search" ? <WebSearchSettingsPanel /> : null}
           {section === "network" ? <NetworkSettingsPanel /> : null}
           {section === "plugins" ? <PluginsSettings pluginId={pluginId} onPluginChange={onPluginChange} onTryPlugin={onTryPlugin} /> : null}

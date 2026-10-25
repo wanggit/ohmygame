@@ -3,7 +3,7 @@ import {
   IMAGE_ASPECT_RATIOS, IMAGE_MAX_REFERENCE_IMAGES, IMAGE_OUTPUT_COUNTS, IMAGE_RESOLUTIONS, VIDEO_ASPECT_RATIOS, VIDEO_RESOLUTIONS,
   type CustomImageModelSettings, type CustomModel3DSettings, type CustomModelUsages, type CustomProviderModel,
   type CustomProviderSettings, type CustomVideoModelSettings, type ImageModel, type ImageProtocol,
-  type Model3DDefinition, type Model3DModel, type ProviderCapability, type VideoModel, type VideoProtocol,
+  type Model3DDefinition, type Model3DModel, type ProviderCapability, type VideoAspectRatio, type VideoModel, type VideoProtocol,
 } from "./contracts.js";
 import { hyper3DCredits } from "./cloud-models.js";
 import { knownImageReferenceLimit } from "./image-reference-limits.js";
@@ -12,7 +12,9 @@ export const IMAGE_PROTOCOL_LABELS: Record<ImageProtocol, string> = {
   "openai-images": "OpenAI Images", "gemini-generate-content": "Gemini Generate Content",
   "openrouter-images": "OpenRouter Images", "volcengine-images": "Seedream",
 };
-export const VIDEO_PROTOCOL_LABELS: Record<VideoProtocol, string> = { "openrouter-videos": "OpenRouter Videos", seedance: "Seedance" };
+export const VIDEO_PROTOCOL_LABELS: Record<VideoProtocol, string> = { "openrouter-videos": "OpenRouter Videos", seedance: "Seedance", "openai-videos": "OpenAI Videos" };
+/** Ratios accepted by synchronous `/videos/generations` gateways; `adaptive` is sent as `auto`. */
+export const OPENAI_VIDEO_ASPECT_RATIOS: readonly VideoAspectRatio[] = ["adaptive", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"];
 
 export function modelUsages(model: CustomProviderModel): CustomModelUsages {
   return model.usages ?? { language: true };
@@ -25,7 +27,9 @@ export function defaultImageSettings(protocol: ImageProtocol = "openai-images", 
   return { protocol, resolutions: ["1K"], aspectRatios: ["1:1", "3:2", "2:3"], maxReferenceImages: knownImageReferenceLimit(modelId) ?? 1, maxOutputs: 1 };
 }
 export function defaultVideoSettings(protocol: VideoProtocol = "openrouter-videos"): CustomVideoModelSettings {
-  return { protocol, resolutions: ["720p"], aspectRatios: ["16:9", "9:16", "1:1"], durations: [6], maxReferenceImages: 1, referenceModes: ["reference"] };
+  return { protocol, resolutions: ["720p"], aspectRatios: ["16:9", "9:16", "1:1"], durations: [6],
+    maxReferenceImages: protocol === "openai-videos" ? 0 : 1,
+    referenceModes: protocol === "openai-videos" ? [] : ["reference"] };
 }
 export function defaultModel3DSettings(modelType: CustomModel3DSettings["modelType"] = "standard", protocol: CustomModel3DSettings["protocol"] = "meshy"): CustomModel3DSettings {
   if (protocol === "hyper3d") return { protocol, operation: "multi-image-to-3d", modelType: "standard", maxReferenceImages: 5,
@@ -40,10 +44,13 @@ export function defaultModel3DSettings(modelType: CustomModel3DSettings["modelTy
 
 export function customImageModel(provider: CustomProviderSettings, model: CustomProviderModel): ImageModel | undefined {
   const config = model.usages?.image;
+  // Aspect-ratio endpoints take ratios, not pixel sizes; leave sizes empty so legacy
+  // pixel requests map through the model's resolution and aspect-ratio options.
   return config ? { provider: provider.id, providerName: provider.name, id: model.id, name: model.name,
-    protocol: config.protocol, sizes: ["1024x1024", "1536x1024", "1024x1536"],
+    protocol: config.protocol, sizes: config.sizeFormat === "aspect-ratio" ? [] : ["1024x1024", "1536x1024", "1024x1536"],
     generationOptions: config.resolutions.flatMap((resolution) => config.aspectRatios.map((aspectRatio) => ({ resolution, aspectRatio }))),
-    supportsReferenceImage: config.maxReferenceImages > 0, maxReferenceImages: config.maxReferenceImages, maxOutputs: config.maxOutputs } : undefined;
+    supportsReferenceImage: config.maxReferenceImages > 0, maxReferenceImages: config.maxReferenceImages, maxOutputs: config.maxOutputs,
+    ...(config.sizeFormat ? { sizeFormat: config.sizeFormat } : {}) } : undefined;
 }
 export function customVideoModel(provider: CustomProviderSettings, model: CustomProviderModel): VideoModel | undefined {
   const config = model.usages?.video;
@@ -80,19 +87,24 @@ export function normalizeModelUsages(value: unknown): CustomModelUsages | undefi
       resolutions: choices(config.resolutions, IMAGE_RESOLUTIONS.filter((value) => value !== "512" || config.protocol === "gemini-generate-content" || config.protocol === "openrouter-images"), "image resolutions"),
       aspectRatios: choices(config.aspectRatios, IMAGE_ASPECT_RATIOS, "image aspect ratios"),
       maxReferenceImages: integer(config.maxReferenceImages, 0, IMAGE_MAX_REFERENCE_IMAGES, "reference image limit"),
-      maxOutputs: choices([config.maxOutputs], IMAGE_OUTPUT_COUNTS, "image output count")[0]! };
+      maxOutputs: choices([config.maxOutputs], IMAGE_OUTPUT_COUNTS, "image output count")[0]!,
+      ...(config.sizeFormat !== undefined ? { sizeFormat: choices([config.sizeFormat], ["pixel", "aspect-ratio"] as const, "image size format")[0]! } : {}) };
   }
   if (value.video !== undefined) {
     const config = value.video;
     if (!object(config) || !Object.hasOwn(VIDEO_PROTOCOL_LABELS, String(config.protocol))) throw new Error("Choose a video protocol");
     if (!Array.isArray(config.durations) || !config.durations.length || config.durations.length > 30) throw new Error("Choose video durations");
-    const maxReferenceImages = integer(config.maxReferenceImages, 0, 30, "reference image limit");
-    const referenceModes = choices(config.referenceModes, ["frame", "reference"] as const, "video reference modes");
+    const protocol = config.protocol as VideoProtocol;
+    // The synchronous /videos/generations protocol fixes the output resolution and
+    // takes text prompts only; providers accept 4–15 second clips.
+    const openAiVideos = protocol === "openai-videos";
+    const maxReferenceImages = openAiVideos ? 0 : integer(config.maxReferenceImages, 0, 30, "reference image limit");
+    const referenceModes = openAiVideos ? [] : choices(config.referenceModes, ["frame", "reference"] as const, "video reference modes");
     if (referenceModes.includes("frame") && maxReferenceImages > 2 && !referenceModes.includes("reference")) throw new Error("Frame mode accepts at most two reference images");
-    usages.video = { protocol: config.protocol as VideoProtocol, ...endpoint(config),
-      resolutions: choices(config.resolutions, VIDEO_RESOLUTIONS, "video resolutions"),
-      aspectRatios: choices(config.aspectRatios, VIDEO_ASPECT_RATIOS, "video aspect ratios"),
-      durations: [...new Set(config.durations.map((duration) => integer(duration, 1, 30, "video duration")))].sort((a, b) => a - b),
+    usages.video = { protocol, ...endpoint(config),
+      resolutions: choices(openAiVideos ? ["720p"] : config.resolutions, VIDEO_RESOLUTIONS, "video resolutions"),
+      aspectRatios: choices(config.aspectRatios, openAiVideos ? OPENAI_VIDEO_ASPECT_RATIOS : VIDEO_ASPECT_RATIOS, "video aspect ratios"),
+      durations: [...new Set(config.durations.map((duration) => integer(duration, openAiVideos ? 4 : 1, openAiVideos ? 15 : 30, "video duration")))].sort((a, b) => a - b),
       maxReferenceImages, referenceModes };
   }
   if (value["3d"] !== undefined) {

@@ -1,4 +1,4 @@
-import type { ImageAspectRatio, ImageModelRef, ImageResolution, ImageSize, PromptImage } from "../shared/contracts.js";
+import type { ImageAspectRatio, ImageModelRef, ImageResolution, ImageSize, ImageSizeFormat, PromptImage } from "../shared/contracts.js";
 
 export type GeneratedImageMediaType = "image/png" | "image/jpeg" | "image/webp";
 
@@ -38,12 +38,12 @@ export class OpenAIImageGenerator implements ImageGenerator {
     private readonly authentication: "api_key" | "none" = "api_key",
   ) {}
 
-  async generate(input: ImageGenerationInput & { model?: string }, signal?: AbortSignal): Promise<GeneratedImage> {
+  async generate(input: ImageGenerationInput & { model?: string; sizeFormat?: ImageSizeFormat }, signal?: AbortSignal): Promise<GeneratedImage> {
     if (!this.apiKey) throw new ImageGenerationError("Image generation is not configured", 503);
     const images = input.images ?? [];
     const endpoint = imageEndpoint(this.baseUrl, images.length > 0);
     const timeout = AbortSignal.timeout(130_000);
-    const size = openAIImageSize(input);
+    const size = input.sizeFormat === "aspect-ratio" ? aspectRatioSize(input) : openAIImageSize(input);
 
     let response: Response;
     try {
@@ -52,7 +52,7 @@ export class OpenAIImageGenerator implements ImageGenerator {
         : JSON.stringify({
             model: input.model ?? "gpt-image-2.5-flare",
             prompt: input.prompt,
-            size,
+            ...(size ? { size } : {}),
             quality: "medium",
             output_format: "webp",
             n: 1,
@@ -174,13 +174,22 @@ export function openAIImageSize(input: ImageGenerationInput): string {
   return OPENAI_IMAGE_SIZES[input.resolution][input.aspectRatio];
 }
 
-function editForm(input: ImageGenerationInput & { model?: string }, size: string): FormData {
+/** Aspect-ratio endpoints take "1:1"-style ratios and no size at all means provider default. */
+function aspectRatioSize(input: ImageGenerationInput): string | undefined {
+  if (input.aspectRatio) return input.aspectRatio;
+  if (input.size === "1024x1024") return "1:1";
+  if (input.size === "1536x1024") return "3:2";
+  if (input.size === "1024x1536") return "2:3";
+  return undefined;
+}
+
+function editForm(input: ImageGenerationInput & { model?: string }, size: string | undefined): FormData {
   const images = input.images;
   if (!images?.length) throw new ImageGenerationError("A reference image is required", 400);
   const form = new FormData();
   form.set("model", input.model ?? "gpt-image-2.5-flare");
   form.set("prompt", input.prompt);
-  form.set("size", size);
+  if (size) form.set("size", size);
   form.set("quality", "medium");
   form.set("output_format", "webp");
   form.set("n", "1");

@@ -127,7 +127,7 @@ import { t, tNodes } from "./i18n.js";
 
 const ASSET_EDGE_PREFIX = "asset:";
 const OUTPUT_HANDLE = "out";
-const STORY_ASSET_ACCEPT = "image/png,image/jpeg,image/svg+xml,image/webp,video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,.svg,.mov,.mp3,.wav";
+const STORY_ASSET_ACCEPT = "image/png,image/jpeg,image/svg+xml,image/webp,video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,audio/flac,.svg,.mov,.mp3,.wav,.flac";
 const MEDIA_NODE_MAX_WIDTH = 440;
 const MEDIA_NODE_MIN_WIDTH = 300;
 const MEDIA_NODE_MAX_HEIGHT = 360;
@@ -2127,7 +2127,7 @@ function PromptAudioNode({ data, selected, operation }: Pick<NodeProps<AssetCanv
       ...(!model.capabilities.supportsLoop ? { loop: undefined } : {}),
       ...(!model.capabilities.supportsNegativePrompt ? { negativePrompt: undefined } : {}),
       ...(!model.capabilities.supportsLyrics ? { lyrics: undefined } : {}),
-      ...(!model.capabilities.supportsInstrumental && operation === "music" ? { instrumental: true } : {}),
+      ...(operation === "music" && (model.capabilities.vocalsOnly || !model.capabilities.supportsInstrumental) ? { instrumental: instrumentalFor(model.capabilities, data.instrumental) } : {}),
       ...(maxDuration !== undefined && data.durationSeconds !== undefined && data.durationSeconds > maxDuration ? { durationSeconds: maxDuration } : {}),
     });
   };
@@ -2182,7 +2182,7 @@ function PromptAudioNode({ data, selected, operation }: Pick<NodeProps<AssetCanv
           disabled={!selectedModel || runtime?.busy}
           onChange={(value) => change({ durationSeconds: value ? Number(value) : undefined })}
         /> : null}
-        {operation === "music" && selectedModel?.capabilities.supportsInstrumental ? <CanvasChipToggle
+        {operation === "music" && selectedModel?.capabilities.supportsInstrumental && !selectedModel?.capabilities.vocalsOnly ? <CanvasChipToggle
           label={t("assetCanvas.instrumental")}
           pressed={data.instrumental !== false}
           disabled={runtime?.busy}
@@ -2204,6 +2204,13 @@ function audioOperationForNode(type: AssetCanvasNodeType): AudioOperation | unde
   if (type === "speech") return "speech";
   if (type === "sound-effect" || type === "music") return type;
   return undefined;
+}
+
+/** Vocals-only models always sing; models without the instrumental option stay instrumental. */
+function instrumentalFor(capabilities: AudioModel["capabilities"] | undefined, fallback: boolean | undefined): boolean | undefined {
+  if (capabilities?.vocalsOnly) return false;
+  if (capabilities && !capabilities.supportsInstrumental) return true;
+  return fallback;
 }
 
 export function canvasNodeTypeAvailable(type: AssetCanvasNodeType, audioOperations: ReadonlySet<AudioOperation>): boolean {
@@ -3381,6 +3388,8 @@ export function applyRememberedSettings(
     const compatibleModels = catalogs.audioModels?.filter((candidate) => candidate.capabilities.operations.includes(operation)) ?? [];
     const reference = settings?.audioModel;
     const model = reference ? compatibleModels.find((candidate) => sameModel(candidate, reference)) : compatibleModels[0];
+    const instrumental = node.type !== "music" ? settings?.instrumental
+      : instrumentalFor(model?.capabilities, settings?.instrumental ?? node.data.instrumental);
     return {
       ...node,
       data: {
@@ -3390,7 +3399,7 @@ export function applyRememberedSettings(
         ...(settings?.speed !== undefined ? { speed: settings.speed } : {}),
         ...(settings?.durationSeconds !== undefined ? { durationSeconds: settings.durationSeconds } : {}),
         ...(settings?.loop !== undefined ? { loop: settings.loop } : {}),
-        ...(settings?.instrumental !== undefined ? { instrumental: settings.instrumental } : {}),
+        ...(instrumental !== undefined ? { instrumental } : {}),
       },
     };
   }
@@ -3842,6 +3851,7 @@ function libraryUploadMediaType(file: File): LibraryUploadMediaType | undefined 
   if (extension === "webm") return "video/webm";
   if (extension === "mp3") return "audio/mpeg";
   if (extension === "wav") return "audio/wav";
+  if (extension === "flac") return "audio/flac";
   return undefined;
 }
 

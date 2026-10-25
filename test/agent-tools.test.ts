@@ -12,29 +12,30 @@ import { listWorkspaceFiles } from "../src/daemon/workspace.js";
 import type { VideoGenerator } from "../src/daemon/video-generation.js";
 import { WEB_GAME_USE_CAPABILITIES, type GameRuntimeAdapter } from "../src/shared/playtest.js";
 import { createNodeCodebase, createPlayableStarterCodebase } from "../src/daemon/playable-codebase.js";
+import { AgentLearningsStore } from "../src/daemon/agent-learnings.js";
 
 const TEST_VIDEO_MODEL = { provider: "openrouter", id: "example/video-model" } as const;
 
 describe("agent tools", () => {
   it("maps enabled product tools to Pi tool names", () => {
     expect(planningPiToolNames()).toEqual(["read", "grep", "find", "ls", "web_search", "questionnaire", "update_plan"]);
-    expect(activePiToolNames([])).toEqual(["read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin"]);
+    expect(activePiToolNames([])).toEqual(["read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin", "remember"]);
     expect(activePiToolNames(["generate-image"])).toEqual([
-      "read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin", "generate_image",
+      "read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin", "remember", "generate_image",
     ]);
     expect(activePiToolNames(["image-to-3d"])).toEqual([
-      "read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin", "generate_3d_asset",
+      "read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin", "remember", "generate_3d_asset",
     ]);
     expect(activePiToolNames(["generate-video"])).toEqual([
-      "read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin", "generate_video",
+      "read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin", "remember", "generate_video",
     ]);
     expect(activePiToolNames(["animate-3d"])).toEqual([
-      "read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin", "animate_3d_asset",
+      "read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin", "remember", "animate_3d_asset",
     ]);
     expect(activePiToolNames(
       [],
       ["read", "generate_image", "web_search"],
-    )).toEqual(["read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin"]);
+    )).toEqual(["read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin", "remember"]);
     expect(projectPiToolNames("planning", ["generate-image"], ["canvas_check", "generate_canvas_media"])).toContain("canvas_check");
     expect(projectPiToolNames("planning", ["generate-image"], ["canvas_check", "generate_canvas_media"])).not.toContain("generate_canvas_media");
     expect(activePiToolNames(["generate-image"], ["canvas_check", "generate_canvas_media"])).toContain("generate_canvas_media");
@@ -48,14 +49,14 @@ describe("agent tools", () => {
       "normal",
       ["generate-image", "generate-video"],
       ["read", "mcp", "web_search", "generate_image"],
-    )).toEqual(["mcp", "read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin", "generate_image", "generate_video"]);
+    )).toEqual(["mcp", "read", "write", "edit", "bash", "web_search", "update_plan", "install_plugin", "remember", "generate_image", "generate_video"]);
     expect(projectPiToolNames(
       "planning",
       ["generate-image"],
       ["mcp", "questionnaire"],
     )).toEqual(["read", "grep", "find", "ls", "web_search", "questionnaire", "update_plan"]);
     expect(projectPiToolNames("normal", [], ["web_search"], false)).toEqual([
-      "read", "write", "edit", "bash", "update_plan", "install_plugin",
+      "read", "write", "edit", "bash", "update_plan", "install_plugin", "remember",
     ]);
   });
 
@@ -400,5 +401,47 @@ describe("agent tools", () => {
     expect(failing.details).toMatchObject({ playableCheck: { mode: "publish", ok: false } });
     expect(text).toMatch(/publish validation issue/);
     expect(text).toContain("missing");
+  });
+
+  it("remembers an approved preference and Skill for later projects", async () => {
+    const dataDirectory = await mkdtemp(path.join(tmpdir(), "ohmygame-agent-remember-"));
+    const agentDirectory = path.join(dataDirectory, "pi-agent");
+    const projects = new ProjectManager(dataDirectory);
+    await projects.load();
+    const project = await projects.create("Puzzle", "general");
+    const runner = new ToolRunner(dataDirectory, { generate: async () => ({ bytes: Buffer.from("image"), mediaType: "image/webp" }) });
+    await runner.load();
+    const store = new AgentLearningsStore(dataDirectory, agentDirectory);
+    const changed = vi.fn();
+    const tool = createAgentTools(project, runner, projects, undefined, undefined, undefined, undefined, undefined, { store, changed }).find(({ name }) => name === "remember");
+    if (!tool) throw new Error("Expected the remember tool");
+
+    const preference = await tool.execute("call-preference", { kind: "preference", text: "  Always generate sprite sheets.  " }, undefined, undefined, {} as never);
+    const preferenceText = preference.content[0]?.type === "text" ? preference.content[0].text : "";
+    expect(preferenceText).toContain("Always generate sprite sheets.");
+    expect(changed).toHaveBeenCalledTimes(1);
+    const stored = JSON.parse(await readFile(path.join(dataDirectory, "agent-learnings.json"), "utf8"));
+    expect(stored.preferences).toMatchObject([{ text: "Always generate sprite sheets.", projectId: project.id, projectName: "Puzzle" }]);
+
+    await tool.execute("call-skill", {
+      kind: "skill",
+      name: "sprite-sheet-animation",
+      description: "Use when a game needs frame-based 2D character animation.",
+      content: "# Sprite sheets\n\nGenerate one multi-cell strip and keep the grid consistent.",
+    }, undefined, undefined, {} as never);
+    const skillFile = await readFile(path.join(agentDirectory, "skills", "sprite-sheet-animation", "SKILL.md"), "utf8");
+    expect(skillFile).toContain("name: sprite-sheet-animation");
+    expect(skillFile).toContain("description: Use when a game needs frame-based 2D character animation.");
+    expect(skillFile).toContain("Generate one multi-cell strip");
+
+    await tool.execute("call-skill-update", {
+      kind: "skill",
+      name: "sprite-sheet-animation",
+      description: "Use when a game needs frame-based animation.",
+      content: "# Sprite sheets\n\nUpdated guidance.",
+    }, undefined, undefined, {} as never);
+    expect(await readFile(path.join(agentDirectory, "skills", "sprite-sheet-animation", "SKILL.md"), "utf8")).toContain("Updated guidance.");
+    await expect(tool.execute("call-invalid", { kind: "skill", name: "Not A Name", description: "x", content: "y" }, undefined, undefined, {} as never))
+      .rejects.toThrow(/lowercase letters/);
   });
 });

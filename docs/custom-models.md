@@ -111,6 +111,7 @@ image connection to generate again.
 | Image | Seedream | `/images/generations` with Seedream JSON parameters |
 | Video | OpenRouter Videos | `/videos`, task polling and output download |
 | Video | Seedance | `/contents/generations/tasks`, task polling and output download |
+| Video | OpenAI Videos | `/videos/generations`, synchronous render and MP4 download |
 | 3D | Meshy | `/image-to-3d` or `/multi-image-to-3d`, task polling and GLB download |
 | 3D | Tripo V3 | `/files`, `/generation/image-to-model` or `/generation/multiview-to-model`, `/tasks/{id}` and GLB download |
 | 3D | Hyper3D Rodin | multipart `/rodin`, `/status`, `/download` and GLB download |
@@ -127,14 +128,28 @@ through an OpenAI-compatible relay use bearer authentication. Services with
 ## Generation settings
 
 Image settings include resolutions, aspect ratios, reference-image limits and
-output count. The application accepts up to 16 image references. Known model IDs
+output count. For the OpenAI Images protocol, **Size parameter** picks the size
+dialect sent to the endpoint: pixel sizes like `1024x1024` (default) or aspect
+ratios like `1:1` for gateways that accept ratio strings only — for example
+FreeAiProxy's image models, which reject pixel sizes. In aspect-ratio mode the
+configured ratio is sent as `size` and a blank request falls back to the
+provider's default. Reference images for the OpenAI Images protocol go through
+multipart `/images/edits`. FreeAiProxy's `yuanbao-image`, `doubao-image` and
+`chatglm-image` take one reference image; `wenxin-image` has no upload entry and
+starts at zero. The application accepts up to 16 image references. Known model IDs
 start with their model's reference count: GPT Image uses 16; Gemini 3 image models
 use 14; Gemini 2.5 Flash Image uses 3. Provider-reported limits take precedence.
 Unknown aliases start with one reference until you set the endpoint's supported
 count. Saved limits are preserved; **Use model default** in Image settings can
 restore a known model's reference count without resetting its other settings.
 Video settings include resolutions, ratios, durations (1–30 seconds), reference-image limits
-(up to 30), and first/last-frame or reference modes.
+(up to 30), and first/last-frame or reference modes. **OpenAI Videos** targets a
+synchronous `POST {base}/videos/generations` endpoint such as FreeAiProxy's
+`doubao-video`: it sends one text-to-video request, waits for the render (often
+8–15 minutes for a 10-second clip), and downloads the returned MP4. That protocol
+has no resolution or reference-image controls, uses the provider's fixed output
+resolution, and accepts durations of 4–15 seconds with `auto` or
+`3:4`/`4:3`/`9:16`/`16:9`/`1:1`/`21:9` ratios.
 
 For Meshy-compatible 3D models, choose a single-image or multi-image template and
 standard or smart topology. Smart topology uses one image. Configure the face

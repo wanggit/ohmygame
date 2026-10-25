@@ -4,7 +4,7 @@ import {
   IMAGE_ASPECT_RATIOS, IMAGE_MAX_REFERENCE_IMAGES, IMAGE_RESOLUTIONS, IMAGE_OUTPUT_COUNTS, VIDEO_ASPECT_RATIOS, VIDEO_RESOLUTIONS,
   type CustomModel3DSettings, type CustomModelUsages, type CustomProviderPreset, type ImageProtocol, type VideoProtocol,
 } from "../shared/contracts.js";
-import { defaultImageSettings, defaultModel3DSettings, defaultVideoSettings, IMAGE_PROTOCOL_LABELS, VIDEO_PROTOCOL_LABELS } from "../shared/custom-models.js";
+import { defaultImageSettings, defaultModel3DSettings, defaultVideoSettings, IMAGE_PROTOCOL_LABELS, OPENAI_VIDEO_ASPECT_RATIOS, VIDEO_PROTOCOL_LABELS } from "../shared/custom-models.js";
 import { knownImageReferenceLimit } from "../shared/image-reference-limits.js";
 import { t } from "./i18n.js";
 
@@ -35,12 +35,17 @@ export function CustomModelUsageFields({ usages, preset, modelId, onChange }: {
       <label><span>{t("modelUsage.imageProtocol")}</span><select value={image.protocol} onChange={(event) => {
         const protocol = event.target.value as ImageProtocol;
         const resolutions = image.resolutions.filter((value) => value !== "512" || protocol === "gemini-generate-content" || protocol === "openrouter-images");
-        onChange({ ...usages, image: { ...image, protocol, resolutions: resolutions.length ? resolutions : ["1K"] } });
+        onChange({ ...usages, image: { ...image, protocol, resolutions: resolutions.length ? resolutions : ["1K"],
+          ...(protocol === "openai-images" ? {} : { sizeFormat: undefined }) } });
       }}>
         {Object.entries(IMAGE_PROTOCOL_LABELS).map(([protocol, label]) => <option key={protocol} value={protocol}>{label}</option>)}
       </select></label>
       <details className="custom-provider-advanced"><summary>{t("modelUsage.imageSettings")}</summary>
         <EndpointField value={image.baseUrl} onChange={(baseUrl) => onChange({ ...usages, image: { ...image, baseUrl } })} />
+        {image.protocol === "openai-images" ? <label><span>{t("modelUsage.sizeFormat")}</span><select value={image.sizeFormat ?? "pixel"} onChange={(event) => onChange({ ...usages, image: { ...image, sizeFormat: event.target.value as NonNullable<typeof image.sizeFormat> } })}>
+          <option value="pixel">{t("modelUsage.sizeFormatPixel")}</option>
+          <option value="aspect-ratio">{t("modelUsage.sizeFormatAspectRatio")}</option>
+        </select></label> : null}
         <ChoiceFields label={t("modelUsage.imageResolutions")} options={IMAGE_RESOLUTIONS.filter((value) => value !== "512" || image.protocol === "gemini-generate-content" || image.protocol === "openrouter-images")} value={image.resolutions} onChange={(resolutions) => onChange({ ...usages, image: { ...image, resolutions } })} />
         <ChoiceFields label={t("modelUsage.imageAspectRatios")} options={IMAGE_ASPECT_RATIOS} value={image.aspectRatios} onChange={(aspectRatios) => onChange({ ...usages, image: { ...image, aspectRatios } })} />
         <div className="project-settings-field-row">
@@ -51,16 +56,28 @@ export function CustomModelUsageFields({ usages, preset, modelId, onChange }: {
       </details>
     </div> : null}
     {video ? <div className="custom-model-use-settings">
-      <label><span>{t("modelUsage.videoProtocol")}</span><select value={video.protocol} onChange={(event) => onChange({ ...usages, video: { ...video, protocol: event.target.value as VideoProtocol } })}>
+      <label><span>{t("modelUsage.videoProtocol")}</span><select value={video.protocol} onChange={(event) => {
+        const protocol = event.target.value as VideoProtocol;
+        if (protocol !== "openai-videos") {
+          onChange({ ...usages, video: { ...video, protocol } });
+          return;
+        }
+        const durations = video.durations.filter((value) => value >= 4 && value <= 15);
+        const aspectRatios = video.aspectRatios.filter((value) => OPENAI_VIDEO_ASPECT_RATIOS.includes(value));
+        onChange({ ...usages, video: { ...video, protocol, resolutions: ["720p"], durations: durations.length ? durations : [6],
+          aspectRatios: aspectRatios.length ? aspectRatios : ["16:9"], maxReferenceImages: 0, referenceModes: [] } });
+      }}>
         {Object.entries(VIDEO_PROTOCOL_LABELS).map(([protocol, label]) => <option key={protocol} value={protocol}>{label}</option>)}
       </select></label>
       <details className="custom-provider-advanced"><summary>{t("modelUsage.videoSettings")}</summary>
         <EndpointField value={video.baseUrl} onChange={(baseUrl) => onChange({ ...usages, video: { ...video, baseUrl } })} />
-        <ChoiceFields label={t("modelUsage.videoResolutions")} options={VIDEO_RESOLUTIONS} value={video.resolutions} onChange={(resolutions) => onChange({ ...usages, video: { ...video, resolutions } })} />
-        <ChoiceFields label={t("modelUsage.videoAspectRatios")} options={VIDEO_ASPECT_RATIOS} value={video.aspectRatios} onChange={(aspectRatios) => onChange({ ...usages, video: { ...video, aspectRatios } })} />
+        {video.protocol === "openai-videos" ? null : <ChoiceFields label={t("modelUsage.videoResolutions")} options={VIDEO_RESOLUTIONS} value={video.resolutions} onChange={(resolutions) => onChange({ ...usages, video: { ...video, resolutions } })} />}
+        <ChoiceFields label={t("modelUsage.videoAspectRatios")} options={video.protocol === "openai-videos" ? OPENAI_VIDEO_ASPECT_RATIOS : VIDEO_ASPECT_RATIOS} value={video.aspectRatios} onChange={(aspectRatios) => onChange({ ...usages, video: { ...video, aspectRatios } })} />
         <NumberListField label={t("modelUsage.durations")} value={video.durations} onChange={(durations) => onChange({ ...usages, video: { ...video, durations } })} />
-        <NumberField label={t("modelUsage.maxVideoReferences")} value={video.maxReferenceImages} min={0} max={30} onChange={(maxReferenceImages) => onChange({ ...usages, video: { ...video, maxReferenceImages } })} />
-        <ChoiceFields label={t("modelUsage.videoReferenceModes")} options={["frame", "reference"] as const} labels={{ frame: t("modelUsage.referenceMode.frame"), reference: t("modelUsage.referenceMode.reference") }} value={video.referenceModes} onChange={(referenceModes) => onChange({ ...usages, video: { ...video, referenceModes } })} />
+        {video.protocol === "openai-videos" ? <p className="custom-provider-hint">{t("modelUsage.openaiVideosHint")}</p> : <>
+          <NumberField label={t("modelUsage.maxVideoReferences")} value={video.maxReferenceImages} min={0} max={30} onChange={(maxReferenceImages) => onChange({ ...usages, video: { ...video, maxReferenceImages } })} />
+          <ChoiceFields label={t("modelUsage.videoReferenceModes")} options={["frame", "reference"] as const} labels={{ frame: t("modelUsage.referenceMode.frame"), reference: t("modelUsage.referenceMode.reference") }} value={video.referenceModes} onChange={(referenceModes) => onChange({ ...usages, video: { ...video, referenceModes } })} />
+        </>}
       </details>
     </div> : null}
     {model3d ? <Model3DSettingsFields value={model3d} onChange={(settings) => onChange({ ...usages, "3d": settings })} /> : null}

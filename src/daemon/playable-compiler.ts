@@ -62,6 +62,7 @@ const EMBEDDED_LOADERS: NonNullable<BuildOptions["loader"]> = {
   ".mp3": "dataurl",
   ".ogg": "dataurl",
   ".wav": "dataurl",
+  ".flac": "dataurl",
   ".mp4": "dataurl",
   ".webm": "dataurl",
   ".otf": "dataurl",

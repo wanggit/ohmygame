@@ -40,6 +40,8 @@ import { AgentRuntimeService } from "./agent-runtimes/service.js";
 import { neverTouchPaths } from "./agent-runtimes/policy.js";
 import { skillFolders } from "./agent-runtimes/skills.js";
 import { appendSystemPromptForProject } from "./agent-prompts.js";
+import { AgentLearningsStore } from "./agent-learnings.js";
+import { AGENT_PREFERENCE_MAX_LENGTH } from "../shared/agent-learnings.js";
 import { isAgentRuntimeId, nativeEffort, type AgentRuntimeId, type AnswerApprovalRequest, type UpdateAgentRuntimeRequest } from "../shared/agent-runtimes.js";
 import { ConversationManager, sessionDirectory, type StoredConversation } from "./conversations.js";
 import { ConversationImageStore } from "./conversation-images.js";
@@ -95,7 +97,9 @@ import { VolcengineTtsProvider } from "./volcengine-tts-provider.js";
 import { VolcengineTtsSettingsStore } from "./volcengine-tts-settings.js";
 import { VolcengineSeedAudioProvider } from "./volcengine-seed-audio-provider.js";
 import { VolcengineSeedAudioSettingsStore } from "./volcengine-seed-audio-settings.js";
-import { AUDIO_OUTPUT_FORMATS, AUDIO_SAMPLE_RATES, AUDIO_VOICE_ID_MAX_LENGTH, AUDIO_VOICE_ID_PATTERN, DOUBAO_SEED_AUDIO_PROVIDER_NAME, DOUBAO_SPEECH_PROVIDER_NAME, availableAudioOperations, type AudioOperation } from "../shared/audio.js";
+import { CustomMusicProvider } from "./custom-music-provider.js";
+import { CustomMusicSettingsStore } from "./custom-music-settings.js";
+import { AUDIO_OUTPUT_FORMATS, AUDIO_SAMPLE_RATES, AUDIO_VOICE_ID_MAX_LENGTH, AUDIO_VOICE_ID_PATTERN, CUSTOM_MUSIC_PROVIDER_NAME, DOUBAO_SEED_AUDIO_PROVIDER_NAME, DOUBAO_SPEECH_PROVIDER_NAME, availableAudioOperations, type AudioOperation } from "../shared/audio.js";
 import { isSeedanceProviderId, SEEDANCE_PROVIDER_IDS, SEEDANCE_PROVIDERS } from "./seedance-models.js";
 import { SeedanceSettingsStore } from "./seedance-settings.js";
 import { isMinimaxProviderId, MINIMAX_PROVIDER_IDS, MINIMAX_PROVIDERS } from "./minimax-models.js";
@@ -455,7 +459,7 @@ const MAX_LIBRARY_UPLOAD_BYTES = 200 * 1024 * 1024;
 const LIBRARY_UPLOAD_MEDIA_TYPES = new Set<LibraryUploadMediaType>([
   "image/png", "image/jpeg", "image/svg+xml", "image/webp",
   "video/mp4", "video/quicktime", "video/webm",
-  "audio/mpeg", "audio/wav",
+  "audio/mpeg", "audio/wav", "audio/flac",
 ]);
 
 const toolRunSchema = {
@@ -616,6 +620,16 @@ export function createApp(options: AppOptions = {}) {
   const projectWrites = new ProjectWrites();
   const webSearchSettings = new WebSearchSettingsStore(dataDirectory);
   const onboarding = new OnboardingStore(dataDirectory);
+  const agentLearnings = new AgentLearningsStore(dataDirectory, piAgentDirectory);
+  /** A corrupt preferences file must not stop every agent session from starting. */
+  const agentPreferenceTexts = async (): Promise<string[]> => {
+    try {
+      return await agentLearnings.preferenceTexts();
+    } catch (cause) {
+      app.log.warn({ err: cause }, "Could not read agent preferences");
+      return [];
+    }
+  };
   const networkSettings = options.networkSettings ?? new NetworkSettingsService(dataDirectory);
   const meshySettings = new MediaProviderKeyStore(dataDirectory, "meshy", "Meshy");
   const tripoSettings = new MediaProviderKeyStore(dataDirectory, "tripo", "Tripo");
@@ -625,6 +639,7 @@ export function createApp(options: AppOptions = {}) {
   const minimaxSettings = new MinimaxSettingsStore(dataDirectory);
   const volcengineTtsSettings = new VolcengineTtsSettingsStore(dataDirectory);
   const volcengineSeedAudioSettings = new VolcengineSeedAudioSettingsStore(dataDirectory);
+  const customMusicSettings = new CustomMusicSettingsStore(dataDirectory);
   const providerModelSettings = new ProviderModelSettingsStore(dataDirectory, piAgentDirectory);
   // Coding agents reach OhMyGame's tools over loopback only when they cannot take them over their own pipe.
   const agentRuntimes = new AgentRuntimeService(dataDirectory, () => {
@@ -738,7 +753,12 @@ export function createApp(options: AppOptions = {}) {
     undefined,
     () => providerEnabled("volcengine-seed-audio"),
   );
-  const providerAudio = new ProviderAudio([volcengineTtsProvider, volcengineSeedAudioProvider]);
+  const customMusicProvider = new CustomMusicProvider(
+    () => customMusicSettings.connection(),
+    options.audioFetch,
+    () => providerEnabled("custom-music"),
+  );
+  const providerAudio = new ProviderAudio([volcengineTtsProvider, volcengineSeedAudioProvider, customMusicProvider]);
   const tools = new ToolRunner(
     dataDirectory,
     options.imageGenerator ?? providerImages,
@@ -860,6 +880,7 @@ export function createApp(options: AppOptions = {}) {
       } : undefined,
       webSearch.enabled() ? (input, signal) => webSearch.search(conversation.summary.id, input, signal) : undefined,
       canvasStore,
+      { store: agentLearnings, changed: () => agents.invalidateProjectSessions(project.id) },
     );
   };
   /** A conversation run by a coding agent CLI, kept in the same session file and checkpoints as Pi's. */
@@ -885,7 +906,7 @@ export function createApp(options: AppOptions = {}) {
       saveGeneratedImage: (fileName, bytes, prompt) => projects.addGeneratedAsset(project.id, fileName, bytes, { prompt }),
       pluginMcp: { config: effectiveMcp, host: pluginCapabilities.host, agentDir: piAgentDirectory },
       skillDirectories: [...pluginSkills.map((skill) => skill.path), ...ownSkills],
-      instructions: appendSystemPromptForProject(project).join("\n\n"),
+      instructions: appendSystemPromptForProject(project, await agentPreferenceTexts()).join("\n\n"),
       policy: {
         workspacePath: project.workspacePath,
         neverTouch: neverTouchPaths(dataDirectory, projects.list().filter((other) => other.id !== project.id).map((other) => other.workspacePath)),
@@ -931,6 +952,7 @@ export function createApp(options: AppOptions = {}) {
         Object.keys(effectiveMcp.mcpServers).length ? { factory: await pluginCapabilities.host.extension(effectiveMcp), host: pluginCapabilities.host } : undefined,
         (provider) => providerModelSettings.responsesTransport(provider),
         () => snapshotWorkspace(project),
+        await agentPreferenceTexts(),
       );
     }),
     activeToolNames: (project, mode, session) => {
@@ -993,7 +1015,7 @@ export function createApp(options: AppOptions = {}) {
     await onboarding.load().catch((err) => app.log.warn({ err }, "Could not load onboarding state"));
     await Promise.all([library.load(), projects.load((projectDirectory, cause) => {
       app.log.warn({ err: cause, projectDirectory }, "Could not load project; skipped during startup");
-    }), tools.load(), pluginSettings.load(), pluginCapabilities.configuration.load(), bundledPlugins.load(), preinstalledPlugins.load(), webSearchSettings.load(), openAIEndpoint.load(), loadOpenAIImages(), meshySettings.load(), tripoSettings.load(), hyper3dSettings.load(), seedanceSettings.load(), minimaxSettings.load(), volcengineTtsSettings.load(), volcengineSeedAudioSettings.load(), providerModelSettings.load(), agentRuntimes.load().catch((err) => app.log.warn({ err }, "Could not load coding agent settings"))]);
+    }), tools.load(), pluginSettings.load(), pluginCapabilities.configuration.load(), bundledPlugins.load(), preinstalledPlugins.load(), webSearchSettings.load(), openAIEndpoint.load(), loadOpenAIImages(), meshySettings.load(), tripoSettings.load(), hyper3dSettings.load(), seedanceSettings.load(), minimaxSettings.load(), volcengineTtsSettings.load(), volcengineSeedAudioSettings.load(), customMusicSettings.load(), providerModelSettings.load(), agentRuntimes.load().catch((err) => app.log.warn({ err }, "Could not load coding agent settings"))]);
     await Promise.all(projects.list().map(async (project) => { projectWrites.initialize(project.id, await readWorkspaceVersion(project)); }));
     for (const error of await preinstalledPlugins.seed(localPlugins)) app.log.warn(error);
     const examplesWarning = await examples.load();
@@ -1074,6 +1096,50 @@ export function createApp(options: AppOptions = {}) {
       const settings = await webSearchSettings.update(request.body);
       invalidatePluginSessions();
       return settings;
+    } catch (cause) {
+      return reply.code(400).send({ error: cause instanceof Error ? cause.message : String(cause) });
+    }
+  });
+
+  const preferenceBodySchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["text"],
+    properties: { text: { type: "string", minLength: 1, maxLength: AGENT_PREFERENCE_MAX_LENGTH } },
+  } as const;
+  app.get("/agent-learnings", async () => agentLearnings.read());
+  app.post<{ Body: { text: string } }>("/agent-learnings/preferences", { schema: { body: preferenceBodySchema } }, async (request, reply) => {
+    try {
+      await agentLearnings.rememberPreference(request.body.text);
+      invalidatePluginSessions();
+      return await agentLearnings.read();
+    } catch (cause) {
+      return reply.code(400).send({ error: cause instanceof Error ? cause.message : String(cause) });
+    }
+  });
+  app.patch<{ Params: { id: string }; Body: { text: string } }>("/agent-learnings/preferences/:id", { schema: { body: preferenceBodySchema } }, async (request, reply) => {
+    try {
+      await agentLearnings.updatePreference(request.params.id, request.body.text);
+      invalidatePluginSessions();
+      return await agentLearnings.read();
+    } catch (cause) {
+      return reply.code(400).send({ error: cause instanceof Error ? cause.message : String(cause) });
+    }
+  });
+  app.delete<{ Params: { id: string } }>("/agent-learnings/preferences/:id", async (request, reply) => {
+    try {
+      await agentLearnings.deletePreference(request.params.id);
+      invalidatePluginSessions();
+      return await agentLearnings.read();
+    } catch (cause) {
+      return reply.code(400).send({ error: cause instanceof Error ? cause.message : String(cause) });
+    }
+  });
+  app.delete<{ Params: { name: string } }>("/agent-learnings/skills/:name", async (request, reply) => {
+    try {
+      await agentLearnings.deleteSkill(request.params.name);
+      invalidatePluginSessions();
+      return await agentLearnings.read();
     } catch (cause) {
       return reply.code(400).send({ error: cause instanceof Error ? cause.message : String(cause) });
     }
@@ -2251,6 +2317,16 @@ export function createApp(options: AppOptions = {}) {
       methods: [{ type: "api_key" as const, label: `${DOUBAO_SEED_AUDIO_PROVIDER_NAME} API key` }],
       credentialType: "api_key" as const,
       capabilities: ["audio"] as const,
+    }, {
+      id: "custom-music",
+      name: CUSTOM_MUSIC_PROVIDER_NAME,
+      configured: customMusicSettings.get().configured,
+      enabled: providerEnabled("custom-music"),
+      custom: false,
+      status: customMusicSettings.get().configured ? "connected" as const : "not_configured" as const,
+      methods: [{ type: "api_key" as const, label: `${CUSTOM_MUSIC_PROVIDER_NAME} API key (optional)` }],
+      credentialType: "api_key" as const,
+      capabilities: ["audio"] as const,
     }];
     // Cloud quota/catalog verification can take tens of seconds. Refresh it in
     // the background and serve the last known snapshot so opening Settings does
@@ -2377,7 +2453,8 @@ export function createApp(options: AppOptions = {}) {
     const minimax = isMinimaxProviderId(providerId);
     const volcengineTts = providerId === "volcengine-tts";
     const volcengineSeedAudio = providerId === "volcengine-seed-audio";
-    if (!native && !seedance && !minimax && !volcengineTts && !volcengineSeedAudio && !runtime.getProvider(providerId)) throw new ModelAuthError("Model provider not found", 404);
+    const customMusic = providerId === "custom-music";
+    if (!native && !seedance && !minimax && !volcengineTts && !volcengineSeedAudio && !customMusic && !runtime.getProvider(providerId)) throw new ModelAuthError("Model provider not found", 404);
     const previousEndpoint = providerId === "openai" ? openAIEndpoint.override() : undefined;
     try {
       await providerModelSettings.removeProviderSettings(providerId, async () => {
@@ -2388,6 +2465,7 @@ export function createApp(options: AppOptions = {}) {
         else if (minimax) await minimaxSettings.clear(providerId);
         else if (volcengineTts) await volcengineTtsSettings.clear();
         else if (volcengineSeedAudio) await volcengineSeedAudioSettings.clear();
+        else if (customMusic) await customMusicSettings.clear();
         else await runtime.logout(providerId);
         await syncOpenAIEndpoint(runtime);
         if (providerId === "openai") await openAIImages.clear(false);
@@ -2507,6 +2585,26 @@ export function createApp(options: AppOptions = {}) {
   });
   app.delete("/settings/models/providers/volcengine-seed-audio", async (_request, reply) => {
     await volcengineSeedAudioSettings.clear();
+    return reply.code(204).send();
+  });
+
+  const customMusicSettingsSchema = { body: {
+    type: "object", additionalProperties: false, minProperties: 1,
+    properties: {
+      baseUrl: { anyOf: [{ type: "string", minLength: 1, maxLength: 2_000 }, { type: "null" }] },
+      apiKey: { anyOf: [{ type: "string", minLength: 1, maxLength: 10_000 }, { type: "null" }] },
+      model: { anyOf: [{ type: "string", minLength: 1, maxLength: 200 }, { type: "null" }] },
+      style: { anyOf: [{ type: "string", minLength: 1, maxLength: 200 }, { type: "null" }] },
+      voice: { anyOf: [{ type: "string", minLength: 1, maxLength: 200 }, { type: "null" }] },
+    },
+  } };
+  app.get("/settings/models/providers/custom-music", async () => customMusicSettings.get());
+  app.put<{ Body: { baseUrl?: string | null; apiKey?: string | null; model?: string | null; style?: string | null; voice?: string | null } }>("/settings/models/providers/custom-music", { schema: customMusicSettingsSchema }, async (request, reply) => {
+    try { return await customMusicSettings.update(request.body); }
+    catch (cause) { return reply.code(400).send({ error: cause instanceof Error ? cause.message : String(cause) }); }
+  });
+  app.delete("/settings/models/providers/custom-music", async (_request, reply) => {
+    await customMusicSettings.clear();
     return reply.code(204).send();
   });
 
@@ -3609,6 +3707,9 @@ function isLibraryMediaOfType(value: Buffer, mediaType: LibraryUploadMediaType):
   }
   if (mediaType === "audio/mpeg") {
     return value.length >= 3 && (value.subarray(0, 3).toString("ascii") === "ID3" || (value[0] === 0xff && (value[1]! & 0xe0) === 0xe0));
+  }
+  if (mediaType === "audio/flac") {
+    return value.length >= 4 && value.subarray(0, 4).toString("ascii") === "fLaC";
   }
   if (mediaType === "video/webm") {
     return value.length >= 4 && value[0] === 0x1a && value[1] === 0x45 && value[2] === 0xdf && value[3] === 0xa3;

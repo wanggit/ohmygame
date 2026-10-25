@@ -8,13 +8,16 @@ export const AUDIO_OPERATIONS = [
 ] as const;
 export type AudioOperation = (typeof AUDIO_OPERATIONS)[number];
 
-export const AUDIO_OUTPUT_FORMATS = ["mp3", "wav"] as const;
+export const AUDIO_OUTPUT_FORMATS = ["mp3", "wav", "flac"] as const;
 export type AudioOutputFormat = (typeof AUDIO_OUTPUT_FORMATS)[number];
 
 export const AUDIO_VOICE_ID_MAX_LENGTH = 256;
 export const AUDIO_VOICE_ID_PATTERN = "^[A-Za-z0-9_-]+$";
 export const DOUBAO_SPEECH_PROVIDER_NAME = "Doubao Speech";
 export const DOUBAO_SEED_AUDIO_PROVIDER_NAME = "Doubao Seed Audio";
+export const CUSTOM_MUSIC_PROVIDER_NAME = "Custom Music API";
+export const CUSTOM_MUSIC_DEFAULT_MODEL = "wenxin-music";
+export const CUSTOM_MUSIC_BASE_URL = "http://127.0.0.1:8000/v1";
 
 export const AUDIO_SAMPLE_RATES = [
   8_000, 16_000, 22_050, 24_000, 32_000, 44_100, 48_000,
@@ -95,6 +98,8 @@ export interface AudioModelCapabilities {
   supportsLoop?: boolean;
   supportsLyrics?: boolean;
   supportsInstrumental?: boolean;
+  /** The provider always sings; the instrumental option is not offered and stays off. */
+  vocalsOnly?: boolean;
   supportsReferenceAudio?: boolean;
   supportsNegativePrompt?: boolean;
 }
@@ -134,7 +139,7 @@ export interface AudioMetadata {
 
 export interface GeneratedAudio {
   bytes: Uint8Array;
-  mediaType: "audio/mpeg" | "audio/wav";
+  mediaType: "audio/mpeg" | "audio/wav" | "audio/flac";
   model: ModelRef;
   metadata?: AudioMetadata;
 }

@@ -519,7 +519,7 @@ export class ToolRunner {
       signal?.throwIfAborted();
       const generated = await this.audioGenerator.generate(input, signal);
       signal?.throwIfAborted();
-      const extension = generated.mediaType === "audio/wav" ? "wav" : "mp3";
+      const extension = generated.mediaType === "audio/wav" ? "wav" : generated.mediaType === "audio/flac" ? "flac" : "mp3";
       const fileName = `output.${extension}`;
       const prompt = input.operation === "speech" ? input.text.trim()
         : input.operation === "dialogue" ? input.turns.map((turn) => turn.text.trim()).filter(Boolean).join("\n")
@@ -691,7 +691,7 @@ function isRunId(value: string): boolean {
 }
 
 function isToolRunFileName(value: string): boolean {
-  return /^(?:output(?:-[1-4])?\.(?:png|jpg|webp)|model\.glb|output\.(?:mp4|mp3|wav))$/.test(value);
+  return /^(?:output(?:-[1-4])?\.(?:png|jpg|webp)|model\.glb|output\.(?:mp4|mp3|wav|flac))$/.test(value);
 }
 
 function isToolId(value: unknown): value is ToolId {

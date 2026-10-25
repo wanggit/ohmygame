@@ -25,6 +25,8 @@ import {
   updateSeedanceApiKey,
   updateVolcengineTtsApiKey,
   updateVolcengineSeedAudioApiKey,
+  getCustomMusicSettings,
+  updateCustomMusicSettings,
   getVolcengineTtsSettings,
   saveVolcengineTtsDefaultVoiceId,
   previewVolcengineTtsSpeech,
@@ -33,7 +35,7 @@ import {
   loginAgentRuntime,
   recheckCodexImages,
 } from "./api.js";
-import { AUDIO_VOICE_ID_MAX_LENGTH, AUDIO_VOICE_ID_PATTERN, VOLCENGINE_TTS_VOICES, type AudioModel } from "../shared/audio.js";
+import { AUDIO_VOICE_ID_MAX_LENGTH, AUDIO_VOICE_ID_PATTERN, CUSTOM_MUSIC_BASE_URL, CUSTOM_MUSIC_DEFAULT_MODEL, VOLCENGINE_TTS_VOICES, type AudioModel } from "../shared/audio.js";
 import { PROVIDER_ICONS } from "./provider-icons.js";
 import { CustomProviderDialog, PROVIDER_API_LABELS, type CustomProviderField } from "./custom-provider-dialog.js";
 import { ProviderModels } from "./provider-models.js";
@@ -260,6 +262,7 @@ function ProviderAuthView({ provider, onBack, onCompleted, onOpenAgents }: { pro
   if (MINIMAX_PROVIDER_IDS.has(provider.id)) return <MinimaxAuthView provider={provider} onBack={onBack} onCompleted={onCompleted} />;
   if (provider.id === "volcengine-tts") return <VolcengineTtsAuthView provider={provider} onBack={onBack} onCompleted={onCompleted} />;
   if (provider.id === "volcengine-seed-audio") return <VolcengineSeedAudioAuthView provider={provider} onBack={onBack} onCompleted={onCompleted} />;
+  if (provider.id === "custom-music") return <CustomMusicAuthView provider={provider} onBack={onBack} onCompleted={onCompleted} />;
   const [method, setMethod] = useState<ModelAuthMethod | undefined>(provider.configured ? undefined : provider.methods.length === 1 ? provider.methods[0]?.type : undefined);
   if (provider.configured || provider.id === "openai") return <ConnectedProvider provider={provider} onBack={onBack} onRemoved={onCompleted} />;
   if (!method) return <AuthMethodChoice provider={provider} onBack={onBack} onChoose={setMethod} />;
@@ -721,6 +724,143 @@ function VolcengineSeedAudioAuthView({ provider, onBack, onCompleted }: { provid
       </form>
       {error || deletion.error ? <p className="settings-error" role="alert">{deletion.error ?? error}</p> : null}
       {provider.configured ? <AudioModels key={`seed-audio-${modelsRevision}`} providerId={provider.id} /> : null}
+    </section>
+  );
+}
+
+function CustomMusicAuthView({ provider, onBack, onCompleted }: { provider: ProviderSummary; onBack: () => void; onCompleted: () => void }) {
+  const deletion = useProviderDeletion(provider.id, onCompleted);
+  const [baseUrl, setBaseUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState("");
+  const [style, setStyle] = useState("");
+  const [voice, setVoice] = useState("");
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [error, setError] = useState<string>();
+  const [saving, setSaving] = useState(false);
+  const [modelsRevision, setModelsRevision] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    void getCustomMusicSettings().then((settings) => {
+      if (!active) return;
+      setBaseUrl(settings.baseUrl ?? "");
+      setModel(settings.model ?? "");
+      setStyle(settings.style ?? "");
+      setVoice(settings.voice ?? "");
+      setHasApiKey(settings.hasApiKey ?? false);
+    }).catch((cause) => { if (active) setError(errorMessage(cause)); });
+    return () => { active = false; };
+  }, []);
+
+  async function save(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    setSaving(true);
+    setError(undefined);
+    try {
+      const updated = await updateCustomMusicSettings({
+        baseUrl: baseUrl.trim() || null,
+        model: model.trim() || null,
+        style: style.trim() || null,
+        voice: voice.trim() || null,
+        ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+      });
+      setHasApiKey(updated.hasApiKey ?? hasApiKey);
+      setApiKey("");
+      setModelsRevision((value) => value + 1);
+      onCompleted();
+    } catch (cause) { setError(errorMessage(cause)); }
+    finally { setSaving(false); }
+  }
+
+  async function removeKey(): Promise<void> {
+    setSaving(true);
+    setError(undefined);
+    try {
+      await updateCustomMusicSettings({ apiKey: null });
+      setHasApiKey(false);
+      setApiKey("");
+    } catch (cause) { setError(errorMessage(cause)); }
+    finally { setSaving(false); }
+  }
+
+  const busy = saving || deletion.busy;
+  return (
+    <section className="settings-panel settings-provider-detail">
+      <ProviderDetailHeader provider={provider} description={t("providers.customMusicDescription")} onBack={onBack}>
+        {provider.configured ? <><ProviderEnableControl provider={provider} disabled={deletion.busy} onChanged={() => setModelsRevision((value) => value + 1)} /><ProviderDeleteButton deletion={deletion} disabled={saving} /></> : null}
+      </ProviderDetailHeader>
+      {provider.configured ? <ProviderDeleteConfirmation provider={provider} deletion={deletion} disabled={saving} /> : null}
+      <form className="settings-detail-field" onSubmit={(event) => void save(event)}>
+        <label className="settings-search-field-label" htmlFor="custom-music-base-url">{t("providers.baseUrl")}</label>
+        <input
+          id="custom-music-base-url"
+          className="settings-search-input"
+          type="url"
+          value={baseUrl}
+          onChange={(event) => setBaseUrl(event.target.value)}
+          placeholder={CUSTOM_MUSIC_BASE_URL}
+          autoComplete="off"
+          spellCheck={false}
+          disabled={busy}
+        />
+        <p className="settings-detail-hint">{t("providers.customMusicBaseUrlHint")}</p>
+        <label className="settings-search-field-label" htmlFor="custom-music-api-key">{t("providers.apiKey")}</label>
+        <div className="settings-detail-inline">
+          <input
+            id="custom-music-api-key"
+            className="settings-search-input"
+            type="password"
+            value={apiKey}
+            onChange={(event) => setApiKey(event.target.value)}
+            placeholder={hasApiKey ? t("providers.replaceKeyPlaceholder") : t("providers.customMusicKeyOptional")}
+            autoComplete="off"
+            disabled={busy}
+          />
+          {hasApiKey ? <button className="settings-secondary-button" type="button" disabled={busy} onClick={() => void removeKey()}>{t("providers.delete.removeKey")}</button> : null}
+        </div>
+        <p className="settings-detail-hint">{t("providers.customMusicKeyHint")}</p>
+        <label className="settings-search-field-label" htmlFor="custom-music-model">{t("providers.customMusicModel")}</label>
+        <input
+          id="custom-music-model"
+          className="settings-search-input"
+          value={model}
+          onChange={(event) => setModel(event.target.value)}
+          placeholder={CUSTOM_MUSIC_DEFAULT_MODEL}
+          autoComplete="off"
+          spellCheck={false}
+          maxLength={200}
+          disabled={busy}
+        />
+        <label className="settings-search-field-label" htmlFor="custom-music-style">{t("providers.customMusicStyle")}</label>
+        <input
+          id="custom-music-style"
+          className="settings-search-input"
+          value={style}
+          onChange={(event) => setStyle(event.target.value)}
+          placeholder={t("providers.customMusicStylePlaceholder")}
+          maxLength={200}
+          disabled={busy}
+        />
+        <p className="settings-detail-hint">{t("providers.customMusicStyleHint")}</p>
+        <label className="settings-search-field-label" htmlFor="custom-music-voice">{t("providers.customMusicVoice")}</label>
+        <input
+          id="custom-music-voice"
+          className="settings-search-input"
+          value={voice}
+          onChange={(event) => setVoice(event.target.value)}
+          placeholder={t("providers.customMusicVoicePlaceholder")}
+          maxLength={200}
+          disabled={busy}
+        />
+        <p className="settings-detail-hint">{t("providers.customMusicVoiceHint")}</p>
+        <button className="settings-primary-button" type="submit" disabled={busy || !baseUrl.trim()}>
+          {saving ? t("common.saving") : t("common.save")}
+        </button>
+      </form>
+      <p className="settings-detail-hint">{t("providers.customMusicHint")}</p>
+      {error || deletion.error ? <p className="settings-error" role="alert">{deletion.error ?? error}</p> : null}
+      {provider.configured ? <AudioModels key={`custom-music-${modelsRevision}`} providerId={provider.id} /> : null}
     </section>
   );
 }

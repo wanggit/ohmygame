@@ -22,6 +22,10 @@ const reference = { mediaType: "image/png", data: Buffer.from("reference").toStr
 const model = (id: string, usages: CustomProviderModel["usages"]): CustomProviderModel => ({
   id, name: id, api: "openai-completions", contextWindow: 32_000, maxTokens: 4_000, reasoning: false, supportsImages: false, usages,
 });
+/** Minimal ISO BMFF payload: a 24-byte `ftyp` box followed by `mdat`. */
+function mp4Fixture(): Buffer {
+  return Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypisom"), Buffer.from([0, 0, 0, 0]), Buffer.from("mdat")]);
+}
 async function fixture(request: typeof fetch = vi.fn(async () => Response.json({ data: [] }))) {
   const directory = await mkdtemp(path.join(tmpdir(), "ohmygame-custom-media-"));
   directories.push(directory);
@@ -136,6 +140,19 @@ describe("unified custom media models", () => {
     expect(request.mock.calls.some(([url]) => String(url).endsWith("/models"))).toBe(false);
   });
 
+  it("sends ratio sizes to aspect-ratio image endpoints and keeps pixel sizes otherwise", async () => {
+    const request = vi.fn<typeof fetch>(async () => Response.json({ data: [{ b64_json: Buffer.from("image").toString("base64") }] }));
+    const { app, save } = await fixture(request);
+    const { id } = await save([
+      model("ratio-image", { image: { ...defaultImageSettings("openai-images"), sizeFormat: "aspect-ratio", baseUrl: "https://images.test/v1" } }),
+      model("pixel-image", { image: { ...defaultImageSettings("openai-images"), baseUrl: "https://images.test/v1" } }),
+    ]);
+    await generate(app, "generate-image", { prompt: "A game icon", resolution: "1K", aspectRatio: "3:2", imageModel: { provider: id, id: "ratio-image" } });
+    expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body)).size).toBe("3:2");
+    await generate(app, "generate-image", { prompt: "A game icon", resolution: "1K", aspectRatio: "3:2", imageModel: { provider: id, id: "pixel-image" } });
+    expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body)).size).toBe("1536x1024");
+  });
+
   it.each(["openrouter-videos", "seedance"] as const)("creates, polls and downloads a custom video alias with %s", async (protocol) => {
     const request = vi.fn<typeof fetch>(async (url, init) => {
       if (String(url) === "https://files.test/output.mp4") return new Response(Buffer.from("video"));
@@ -150,6 +167,46 @@ describe("unified custom media models", () => {
       ? ["https://videos.test/api/contents/generations/tasks", "https://videos.test/api/contents/generations/tasks/video-job", "https://files.test/output.mp4"]
       : ["https://videos.test/api/videos", "https://videos.test/api/videos/video-job", "https://files.test/output.mp4"]);
     expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body)).model).toBe("custom-video");
+  });
+
+  it("generates a synchronous OpenAI Videos alias and downloads its MP4", async () => {
+    const mp4 = mp4Fixture();
+    const request = vi.fn<typeof fetch>(async (url) => {
+      if (String(url) === "https://files.test/output.mp4") return new Response(new Uint8Array(mp4), { headers: { "content-type": "video/mp4" } });
+      return Response.json({ created: 1, data: [{ url: "https://files.test/output.mp4" }] }, { headers: { "x-request-id": "video-request-1" } });
+    });
+    const { app, save } = await fixture(request);
+    const { id } = await save([model("doubao-video", { video: { ...defaultVideoSettings("openai-videos"), baseUrl: "https://videos.test/v1" } })]);
+    await generate(app, "generate-video", { prompt: "A paper boat sailing on a puddle", duration: 6, resolution: "720p", aspectRatio: "16:9", model: { provider: id, id: "doubao-video" } });
+    expect(request.mock.calls.map(([url]) => String(url))).toEqual(["https://videos.test/v1/videos/generations", "https://files.test/output.mp4"]);
+    expect(request.mock.calls[0]?.[1]?.headers).toMatchObject({ authorization: `Bearer ${connection.apiKey}` });
+    expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toEqual({
+      model: "doubao-video", prompt: "A paper boat sailing on a puddle", n: 1, size: "16:9", duration: 6, response_format: "url",
+    });
+  });
+
+  it("fixes OpenAI Videos to one resolution, no references and 4–15 second durations", async () => {
+    const { app } = await fixture();
+    const { id } = await app.inject({ method: "POST", url: "/settings/models/providers/custom", payload: {
+      ...connection, modelConfigurationVersion: 2,
+      models: [model("doubao-video", { video: { ...defaultVideoSettings("openai-videos"), resolutions: ["1080p"], durations: [4, 10], maxReferenceImages: 4 } })],
+    } }).then((result) => { expect(result.statusCode, result.body).toBe(201); return result.json() as { id: string }; });
+    const details = (await app.inject({ method: "GET", url: `/settings/models/providers/${id}/custom` })).json();
+    expect(details.models[0].usages.video).toEqual(expect.objectContaining({
+      protocol: "openai-videos", resolutions: ["720p"], durations: [4, 10], maxReferenceImages: 0,
+    }));
+    for (const duration of [3, 16]) {
+      const rejected = await app.inject({ method: "POST", url: "/settings/models/providers/custom", payload: {
+        ...connection, modelConfigurationVersion: 2,
+        models: [model("doubao-video", { video: { ...defaultVideoSettings("openai-videos"), durations: [duration] } })],
+      } });
+      expect(rejected.statusCode, rejected.body).toBe(400);
+    }
+    const rejectedRatio = await app.inject({ method: "POST", url: "/settings/models/providers/custom", payload: {
+      ...connection, modelConfigurationVersion: 2,
+      models: [model("doubao-video", { video: { ...defaultVideoSettings("openai-videos"), aspectRatios: ["3:2"] } })],
+    } });
+    expect(rejectedRatio.statusCode, rejectedRatio.body).toBe(400);
   });
 
   it.each(["image-to-3d", "multi-image-to-3d"] as const)("runs a custom Meshy alias through %s with its configured polycount", async (operation) => {

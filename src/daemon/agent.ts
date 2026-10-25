@@ -2924,6 +2924,7 @@ export async function createPiSession(
   mcp?: { factory: ExtensionFactory; host: PluginMcpHost },
   responsesTransport?: (provider: string) => ResponsesTransportMode,
   snapshotBeforeMessage?: () => Promise<string>,
+  preferences: readonly string[] = [],
 ): Promise<CodingSession> {
   let checkpointFailure: { cause: unknown } | undefined;
   let stopForCheckpointFailure: () => void = () => {};
@@ -2963,7 +2964,7 @@ export async function createPiSession(
   // Trusted-local phase: cwd guides Pi but is not an OS security boundary.
   const { resourceLoader, sessionSettings, pluginSkills } = await createPiResourceLoader(project.workspacePath, agentDir, {
     resolvePluginSkills,
-    appendSystemPrompt: appendSystemPromptForProject(project),
+    appendSystemPrompt: appendSystemPromptForProject(project, preferences),
     mcpFactory: mcp?.factory,
     checkpointFactory: guardedCheckpoints,
     designGateFactory,

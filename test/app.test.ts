@@ -865,6 +865,7 @@ describe("daemon", () => {
       "web_search",
       "update_plan",
       "install_plugin",
+      "remember",
       "generate_image",
       "generate_3d_asset",
       "generate_video",
@@ -917,6 +918,7 @@ describe("daemon", () => {
       "web_search",
       "update_plan",
       "install_plugin",
+      "remember",
       "generate_image",
       "generate_3d_asset",
       "generate_video",
@@ -1663,6 +1665,7 @@ describe("daemon", () => {
       providers: [
         expect.objectContaining({ provider: "volcengine-tts", configured: false, state: "not_configured" }),
         expect.objectContaining({ provider: "volcengine-seed-audio", configured: false, state: "not_configured" }),
+        expect.objectContaining({ provider: "custom-music", configured: false, state: "not_configured" }),
       ],
     });
     expect((await app.inject({
@@ -1695,6 +1698,7 @@ describe("daemon", () => {
       providers: [
         expect.objectContaining({ provider: "volcengine-tts", state: "ready" }),
         expect.objectContaining({ provider: "volcengine-seed-audio", state: "not_configured" }),
+        expect.objectContaining({ provider: "custom-music", state: "not_configured" }),
       ],
     });
 
@@ -1711,6 +1715,7 @@ describe("daemon", () => {
       providers: [
         expect.objectContaining({ provider: "volcengine-tts", state: "not_configured" }),
         expect.objectContaining({ provider: "volcengine-seed-audio", state: "not_configured" }),
+        expect.objectContaining({ provider: "custom-music", state: "not_configured" }),
       ],
     });
   });
@@ -1750,6 +1755,73 @@ describe("daemon", () => {
     expect((await app.inject({ method: "DELETE", url: "/settings/models/providers/volcengine-seed-audio" })).statusCode).toBe(204);
     expect((await app.inject({ method: "GET", url: "/settings/models/providers/volcengine-seed-audio" })).json())
       .toEqual({ configured: false });
+  });
+
+  it("connects the Custom Music gateway and exposes its music model", async () => {
+    const app = createApp({ dataDirectory: await mkdtemp(path.join(tmpdir(), "ohmygame-custom-music-settings-")) });
+    apps.push(app);
+
+    expect((await app.inject({ method: "GET", url: "/settings/models/providers/custom-music" })).json())
+      .toEqual({ configured: false, hasApiKey: false });
+    expect((await app.inject({ method: "PUT", url: "/settings/models/providers/custom-music", payload: {} })).statusCode).toBe(400);
+    expect((await app.inject({
+      method: "PUT",
+      url: "/settings/models/providers/custom-music",
+      payload: { baseUrl: "not-a-url" },
+    })).statusCode).toBe(400);
+
+    expect((await app.inject({
+      method: "PUT",
+      url: "/settings/models/providers/custom-music",
+      payload: {
+        baseUrl: "http://127.0.0.1:8000/v1",
+        apiKey: "music-key",
+        model: "wenxin-music",
+        style: "流行",
+        voice: "甜美女声",
+      },
+    })).json()).toEqual({
+      configured: true,
+      hasApiKey: true,
+      baseUrl: "http://127.0.0.1:8000/v1",
+      model: "wenxin-music",
+      style: "流行",
+      voice: "甜美女声",
+    });
+
+    const providers = (await app.inject({ method: "GET", url: "/settings/providers" })).json();
+    expect(providers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "custom-music", configured: true, capabilities: ["audio"] }),
+    ]));
+    expect(JSON.stringify(providers)).not.toContain("music-key");
+
+    const catalog = (await app.inject({ method: "GET", url: "/audio-models/catalog" })).json();
+    expect(catalog.models).toEqual([
+      expect.objectContaining({
+        provider: "custom-music",
+        id: "wenxin-music",
+        capabilities: expect.objectContaining({ operations: ["music"], vocalsOnly: true, supportsLyrics: true }),
+      }),
+    ]);
+    expect(catalog.providers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ provider: "custom-music", state: "ready" }),
+    ]));
+
+    expect((await app.inject({
+      method: "PUT",
+      url: "/settings/models/providers/custom-music",
+      payload: { style: null, apiKey: null },
+    })).json()).toEqual({
+      configured: true,
+      hasApiKey: false,
+      baseUrl: "http://127.0.0.1:8000/v1",
+      model: "wenxin-music",
+      voice: "甜美女声",
+    });
+
+    expect((await app.inject({ method: "DELETE", url: "/settings/models/providers/custom-music" })).statusCode).toBe(204);
+    expect((await app.inject({ method: "GET", url: "/settings/models/providers/custom-music" })).json())
+      .toEqual({ configured: false, hasApiKey: false });
   });
 
   it("previews Doubao Speech audio through the saved connection", async () => {

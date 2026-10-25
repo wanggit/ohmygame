@@ -107,6 +107,46 @@ describe("OpenAI image generator", () => {
     expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toMatchObject({ size });
   });
 
+  it("sends aspect-ratio sizes for ratio-style endpoints", async () => {
+    const request = vi.fn<typeof fetch>(async () => Response.json({
+      data: [{ b64_json: Buffer.from("image").toString("base64") }],
+    }));
+    const generator = new OpenAIImageGenerator("key", "http://127.0.0.1:8000/v1", request);
+
+    await generator.generate({ prompt: "A game icon", resolution: "2K", aspectRatio: "16:9", sizeFormat: "aspect-ratio", model: "wenxin-image" });
+    expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toEqual({
+      model: "wenxin-image",
+      prompt: "A game icon",
+      size: "16:9",
+      quality: "medium",
+      output_format: "webp",
+      n: 1,
+    });
+
+    await generator.generate({ prompt: "A game icon", size: "1536x1024", sizeFormat: "aspect-ratio" });
+    expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body))).toMatchObject({ size: "3:2" });
+
+    await generator.generate({ prompt: "A game icon", sizeFormat: "aspect-ratio" });
+    expect(JSON.parse(String(request.mock.calls[2]?.[1]?.body))).not.toHaveProperty("size");
+  });
+
+  it("uses ratio sizes in multipart edits for aspect-ratio endpoints", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json({
+      data: [{ b64_json: Buffer.from("edited").toString("base64") }],
+    }));
+    const generator = new OpenAIImageGenerator("key", "http://127.0.0.1:8000/v1", request);
+
+    await generator.generate({
+      prompt: "Turn this into concept art",
+      aspectRatio: "1:1",
+      sizeFormat: "aspect-ratio",
+      images: [{ mediaType: "image/png", data: Buffer.from("reference").toString("base64") }],
+    });
+
+    const form = request.mock.calls[0]?.[1]?.body as FormData;
+    expect(form.get("size")).toBe("1:1");
+  });
+
   it("rejects the unsupported 512px output tier", async () => {
     const request = vi.fn<typeof fetch>();
     const generator = new OpenAIImageGenerator("key", undefined, request);

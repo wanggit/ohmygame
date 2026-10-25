@@ -11,6 +11,8 @@ const COMMON_AGENT_INSTRUCTIONS = [
   "The user and the OhMyGame editor can change files between your turns. Build on the files as they are now, and do not revert changes you did not make.",
   "When canvas/index.json exists, read canvas/AGENTS.md, the index and relevant boards/documents before canvas, design or asset work. If the requested work needs a canvas and none exists, use canvas_initialize before editing. For game implementation, also read the main document if one is selected. Canvas is ordinary project JSON, Markdown and local media; use read/edit/write and run canvas_check after changes. Use the current board and selected node IDs from editor context to resolve references. Preserve IDs and concurrent user edits. Read actual image files when evaluating appearance. Follow the user's current request and explicitly referenced document snapshots; do not silently rewrite documents. Use generate_canvas_media to execute saved generation nodes through shared canvas history. Editing a prompt or reference does not request generation. Casual conversation needs no canvas reads.",
   "End a turn that changed the game with a short summary in the user's language: what changed in terms of what the player sees, how you checked it, and anything you could not verify. Do not repeat file contents the user can already see.",
+  "When the user states a default that should apply beyond this project, such as \"from now on\" or \"always\", or repeats a correction they already made, propose once and briefly to remember it with the remember tool. Save a one-line default as a preference and a reusable procedure with steps or checks as a Skill. Call remember only after the user agrees, never save silently, do not propose the same lesson again after the user declines, and do not suggest it for details specific to this project.",
+  "Frame-based 2D animation defaults to one sprite sheet: generate every frame together in a single image with a fixed grid of evenly sized cells, one frame per cell, in one settled order. State the action, frame count, grid (columns × rows), cell size, transparent background, and the shared scale and anchor in the generation prompt. Generating frames separately lets identity, scale, and anchor drift; do that only when the user asks for it or the generator cannot produce a usable sheet. Use sprite-pipeline when available, and keep the grid consistent with the runtime's frame size and animation metadata.",
 ] as const;
 
 const GENERATED_MEDIA = "Media generation tools (generate_image, generate_video, generate_3d_asset, when available) save files under assets/generated/ in the workspace and return the path. A file there is not part of the game until the game's own source uses it as described next.";
@@ -45,7 +47,17 @@ const INTERACTIVE_STORY_INSTRUCTIONS = [
   "A user message may end with an <editor-context> block about what the user is looking at: the Node open in the editor, whose source files are attached as references; elements they picked in its preview, each with its source location; a drawing they made over the preview, shown in orange on the attached screenshot; a moment they marked in the Node's background video, in seconds from the start of the file, with a screenshot of the preview at that moment; and media they added, already declared on the Node as an Asset. Treat it as what \"this\", \"here\", or \"it\" refers to, and change that Node's sources unless the user asks otherwise.",
 ] as const;
 
-export function appendSystemPromptForProject(project: AgentPromptProject): string[] {
+export function appendSystemPromptForProject(project: AgentPromptProject, preferences: readonly string[] = []): string[] {
+  return withPreferences(projectInstructions(project), preferences);
+}
+
+/** User-approved lessons for every project; kept last so they stay in view. */
+function withPreferences(instructions: string[], preferences: readonly string[]): string[] {
+  if (!preferences.length) return instructions;
+  return [...instructions, `The user asked OhMyGame to remember these preferences for every project. Follow them unless the current request conflicts:\n${preferences.map((text) => `- ${text}`).join("\n")}`];
+}
+
+function projectInstructions(project: AgentPromptProject): string[] {
   if (project.type === "general") return [
     ...COMMON_AGENT_INSTRUCTIONS,
     ...GENERAL_GAME_INSTRUCTIONS,

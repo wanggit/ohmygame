@@ -21,6 +21,8 @@ import { readCanvasAssets } from "./canvas-assets.js";
 import { designGateForProject } from "./design-confirmation.js";
 import { designGateBlockReason } from "../shared/design-confirmation.js";
 import { AUDIO_VOICE_ID_MAX_LENGTH, AUDIO_VOICE_ID_PATTERN } from "../shared/audio.js";
+import { AGENT_PREFERENCE_MAX_LENGTH, AGENT_SKILL_DESCRIPTION_MAX_LENGTH, AGENT_SKILL_NAME_MAX_LENGTH } from "../shared/agent-learnings.js";
+import type { AgentLearningsStore } from "./agent-learnings.js";
 import { inspectPluginDraft } from "./plugin-draft.js";
 
 const PI_TOOL_NAMES: Record<ToolId, string> = {
@@ -32,12 +34,12 @@ const PI_TOOL_NAMES: Record<ToolId, string> = {
   "generate-sound-effect": "generate_sound_effect",
   "generate-music": "generate_music",
 };
-const PI_BUILTIN_TOOL_NAMES = new Set(["read", "write", "edit", "bash", "grep", "find", "ls", "web_search", "update_plan", "questionnaire", "install_plugin", "generate_canvas_media"]);
+const PI_BUILTIN_TOOL_NAMES = new Set(["read", "write", "edit", "bash", "grep", "find", "ls", "web_search", "update_plan", "questionnaire", "install_plugin", "remember", "generate_canvas_media"]);
 
 export function activePiToolNames(enabledTools: readonly ToolId[], registeredToolNames: readonly string[] = [], webSearchEnabled = true): string[] {
   const ohMyGameToolNames = new Set(Object.values(PI_TOOL_NAMES));
   const extensionTools = registeredToolNames.filter((name) => !ohMyGameToolNames.has(name) && !PI_BUILTIN_TOOL_NAMES.has(name));
-  return [...new Set([...extensionTools, "read", "write", "edit", "bash", ...(webSearchEnabled ? ["web_search"] : []), "update_plan", "install_plugin", ...enabledTools.map((id) => PI_TOOL_NAMES[id]), ...(enabledTools.length && registeredToolNames.includes("generate_canvas_media") ? ["generate_canvas_media"] : [])])];
+  return [...new Set([...extensionTools, "read", "write", "edit", "bash", ...(webSearchEnabled ? ["web_search"] : []), "update_plan", "install_plugin", "remember", ...enabledTools.map((id) => PI_TOOL_NAMES[id]), ...(enabledTools.length && registeredToolNames.includes("generate_canvas_media") ? ["generate_canvas_media"] : [])])];
 }
 
 export function planningPiToolNames(webSearchEnabled = true): string[] {
@@ -71,6 +73,16 @@ export type AskQuestionnaire = (
 export type InstallPlugin = (sourcePath: string) => Promise<PluginDetail>;
 export type SearchWeb = (input: WebSearchInput, signal?: AbortSignal) => Promise<WebSearchExecution>;
 
+/** Personal lessons the user approved, plus the hook that makes them apply to later turns. */
+export interface Remembering {
+  store: AgentLearningsStore;
+  changed: () => void;
+}
+
+interface RememberedLearning {
+  learning: { kind: "preference" | "skill"; id?: string; text?: string; name?: string; created?: boolean };
+}
+
 const mediaModelParameter = () => Type.Object({
   provider: Type.String({ description: "Model provider ID" }),
   id: Type.String({ description: "Provider model ID" }),
@@ -85,6 +97,7 @@ export function createAgentTools(
   playtest?: { driver: GameRuntimeAdapter; resolveOpenTarget: () => Promise<GameUseOpenTarget> },
   searchWeb?: SearchWeb,
   canvasStore?: CanvasStore,
+  remembering?: Remembering,
 ): PiToolDefinition[] {
   const saveGeneratedAudio = async (
     toolId: "generate-speech" | "generate-sound-effect" | "generate-music",
@@ -100,7 +113,7 @@ export function createAgentTools(
       const file = await tools.file(run.id, output.name);
       if (!file) throw new Error("Generated audio could not be read");
       signal?.throwIfAborted();
-      const extension = output.mediaType === "audio/wav" ? "wav" : "mp3";
+      const extension = output.mediaType === "audio/wav" ? "wav" : output.mediaType === "audio/flac" ? "flac" : "mp3";
       const relativePath = await projects.addGeneratedAsset(project.id, `${prefix}-${run.id}.${extension}`, file.bytes, {
         prompt,
         ...(file.assetId ? { libraryAssetId: file.assetId } : {}),
@@ -187,6 +200,49 @@ export function createAgentTools(
       return {
         content: [{ type: "text", text: `Created and installed ${plugin.displayName}.\n${counts}\nSource: ${sourcePath}` }],
         details: { plugin: { id: plugin.id, displayName: plugin.displayName, sourcePath } },
+      };
+    },
+  }), defineTool({
+    name: "remember",
+    label: "Remember",
+    description: "Save a lesson the user agreed to reuse in future projects. Use kind \"preference\" for a short default behavior and \"skill\" for a reusable procedure with steps, checks, or examples. Saved preferences apply to every project and appear in Settings; saved Skills are personal Skills staged into every game session. Call this only after the user agrees, and prefer updating an existing Skill over creating a near-duplicate.",
+    parameters: Type.Object({
+      kind: Type.Union([Type.Literal("preference"), Type.Literal("skill")], { description: "Whether this is a one-line default behavior or a reusable procedure" }),
+      text: Type.Optional(Type.String({ minLength: 1, maxLength: AGENT_PREFERENCE_MAX_LENGTH, description: "The preference, in one sentence. Required for kind=preference" })),
+      name: Type.Optional(Type.String({ minLength: 1, maxLength: AGENT_SKILL_NAME_MAX_LENGTH, description: "Kebab-case Skill name. Required for kind=skill" })),
+      description: Type.Optional(Type.String({ minLength: 1, maxLength: AGENT_SKILL_DESCRIPTION_MAX_LENGTH, description: "When to use the Skill. Required for kind=skill" })),
+      content: Type.Optional(Type.String({ minLength: 1, description: "The Skill body in Markdown. Required for kind=skill" })),
+    }),
+    execute: async (_toolCallId, input, signal) => {
+      if (!remembering) throw new Error("Remembering is not available");
+      signal?.throwIfAborted();
+      const source = { projectId: project.id, projectName: project.name };
+      if (input.kind === "preference") {
+        if (!input.text?.trim()) throw new Error("text is required for a preference");
+        const { preference, created } = await remembering.store.rememberPreference(input.text, source);
+        if (created) remembering.changed();
+        const details: RememberedLearning = { learning: { kind: "preference", id: preference.id, text: preference.text } };
+        return {
+          content: [{ type: "text", text: created
+            ? `Saved as a personal preference for every project from the next turn: ${preference.text}`
+            : `Already saved as a personal preference: ${preference.text}` }],
+          details,
+        };
+      }
+      if (!input.name?.trim() || !input.description?.trim() || !input.content?.trim()) {
+        throw new Error("name, description and content are required for a Skill");
+      }
+      const { skill, created } = await remembering.store.saveSkill({
+        name: input.name,
+        description: input.description,
+        content: input.content,
+        source,
+      });
+      remembering.changed();
+      const details: RememberedLearning = { learning: { kind: "skill", name: skill.name, created } };
+      return {
+        content: [{ type: "text", text: `${created ? "Saved" : "Updated"} the personal Skill "${skill.name}". It is available in every project from the next turn.` }],
+        details,
       };
     },
   }), defineTool({
@@ -442,7 +498,7 @@ export function createAgentTools(
       language: Type.Optional(Type.String({ maxLength: 40 })),
       style: Type.Optional(Type.String({ maxLength: 2_000, description: "Delivery or emotional direction" })),
       speed: Type.Optional(Type.Number({ minimum: -50, maximum: 100 })),
-      format: Type.Optional(Type.Union([Type.Literal("mp3"), Type.Literal("wav")], { description: "Output format supported by the selected model; Doubao Speech supports mp3 only" })),
+      format: Type.Optional(Type.Union([Type.Literal("mp3"), Type.Literal("wav"), Type.Literal("flac")], { description: "Output format supported by the selected model; Doubao Speech supports mp3 only" })),
       sampleRate: Type.Optional(Type.Union([8_000, 16_000, 22_050, 24_000, 32_000, 44_100, 48_000].map((value) => Type.Literal(value)))),
     }),
     execute: async (_toolCallId, input, signal) => saveGeneratedAudio("generate-speech", {
@@ -459,7 +515,7 @@ export function createAgentTools(
       durationSeconds: Type.Optional(Type.Number({ minimum: 0.1, maximum: 600 })),
       loop: Type.Optional(Type.Boolean()),
       negativePrompt: Type.Optional(Type.String({ maxLength: 4_000 })),
-      format: Type.Optional(Type.Union([Type.Literal("mp3"), Type.Literal("wav")])),
+      format: Type.Optional(Type.Union([Type.Literal("mp3"), Type.Literal("wav"), Type.Literal("flac")])),
     }),
     execute: async (_toolCallId, input, signal) => saveGeneratedAudio("generate-sound-effect", {
       prompt: input.prompt, model: input.model, durationSeconds: input.durationSeconds, loop: input.loop,
@@ -472,11 +528,11 @@ export function createAgentTools(
     parameters: Type.Object({
       prompt: Type.String({ minLength: 1, maxLength: 4_000, description: "Describe genre, mood, tempo, instrumentation, and structure" }),
       model: Type.Optional(mediaModelParameter()),
-      instrumental: Type.Boolean({ description: "Generate without vocals" }),
+      instrumental: Type.Boolean({ description: "Generate without vocals; models that always sing reject true" }),
       lyrics: Type.Optional(Type.String({ maxLength: 20_000 })),
       durationSeconds: Type.Optional(Type.Number({ minimum: 0.1, maximum: 600 })),
       loop: Type.Optional(Type.Boolean()),
-      format: Type.Optional(Type.Union([Type.Literal("mp3"), Type.Literal("wav")])),
+      format: Type.Optional(Type.Union([Type.Literal("mp3"), Type.Literal("wav"), Type.Literal("flac")])),
     }),
     execute: async (_toolCallId, input, signal) => saveGeneratedAudio("generate-music", {
       prompt: input.prompt, model: input.model, instrumental: input.instrumental, lyrics: input.lyrics,

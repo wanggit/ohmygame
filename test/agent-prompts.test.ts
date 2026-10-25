@@ -5,6 +5,10 @@ function prompt(project: Parameters<typeof appendSystemPromptForProject>[0]): st
   return appendSystemPromptForProject(project).join("\n\n");
 }
 
+function appending(preferences: string[]): string[] {
+  return appendSystemPromptForProject({ type: "web-game" }, preferences);
+}
+
 describe("OhMyGame system prompt", () => {
   it("preserves shared interaction guidance for every project type", () => {
     for (const type of ["general", "web-game", "godot-game", "interactive-story", "asset-canvas"] as const) {
@@ -18,6 +22,28 @@ describe("OhMyGame system prompt", () => {
       expect(text).toContain("For game implementation, also read the main document if one is selected");
       expect(text).not.toContain("may be empty");
     }
+  });
+
+  it("defaults frame-based 2D animation to one multi-cell sprite sheet", () => {
+    for (const type of ["general", "web-game", "godot-game", "interactive-story", "asset-canvas"] as const) {
+      const text = prompt({ type });
+
+      expect(text).toContain("Frame-based 2D animation defaults to one sprite sheet");
+      expect(text).toContain("fixed grid of evenly sized cells");
+      expect(text).toContain("frame count, grid (columns × rows), cell size");
+      expect(text).toContain("identity, scale, and anchor drift");
+      expect(text).toContain("sprite-pipeline");
+    }
+  });
+
+  it("appends saved personal preferences after the project contract", () => {
+    const base = appendSystemPromptForProject({ type: "web-game" });
+    expect(appending([])).toEqual(base);
+
+    const lines = appending(["Generate sprite sheets for animation."]);
+    expect(lines).toHaveLength(base.length + 1);
+    expect(lines.at(-1)).toContain("remember these preferences for every project");
+    expect(lines.at(-1)).toContain("- Generate sprite sheets for animation.");
   });
 
   it("carries the Web Game platform contract in the system prompt", () => {

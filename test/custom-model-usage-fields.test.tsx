@@ -27,6 +27,8 @@ describe("custom image reference settings", () => {
     ["gemini-2.5-flash-image", "google", 3],
     ["doubao-seedream-5-0-pro-260628", "seedance", 10],
     ["doubao-seedream-5-0-260128", "seedance", 14],
+    ["doubao-image", undefined, 1],
+    ["wenxin-image", undefined, 0],
     ["my-image-alias", undefined, 1],
   ] as const)("enables %s with its known reference count", async (modelId, preset, limit) => {
     const onChange = vi.fn();
@@ -49,5 +51,27 @@ describe("custom image reference settings", () => {
     const restore = [...host.querySelectorAll("button")].find((button) => button.textContent === "Use model default (16 references)")!;
     await act(async () => restore.click());
     expect(onChange).toHaveBeenCalledWith({ ...usages, image: { ...usages.image, maxReferenceImages: 16 } });
+  });
+});
+
+describe("custom video protocol settings", () => {
+  it("resets unsupported options when OpenAI Videos is selected", async () => {
+    const onChange = vi.fn();
+    await act(async () => root.render(<CustomModelUsageFields usages={{ video: { ...defaultVideoSettings(), resolutions: ["1080p"], maxReferenceImages: 4 } }} modelId="doubao-video" onChange={onChange} />));
+    const select = host.querySelector("select")!;
+    await act(async () => {
+      select.value = "openai-videos";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(onChange).toHaveBeenCalledWith({ video: expect.objectContaining({ protocol: "openai-videos", resolutions: ["720p"], maxReferenceImages: 0 }) });
+  });
+
+  it("hides the resolution and reference controls for OpenAI Videos", async () => {
+    await act(async () => root.render(<CustomModelUsageFields usages={{ video: defaultVideoSettings("openai-videos") }} modelId="doubao-video" onChange={vi.fn()} />));
+    const legends = [...host.querySelectorAll("legend")].map((legend) => legend.textContent);
+    expect(legends).toContain("Video aspect ratios");
+    expect(legends).not.toContain("Video resolutions");
+    expect(legends).not.toContain("Video reference modes");
+    expect(host.textContent).toContain("/videos/generations");
   });
 });

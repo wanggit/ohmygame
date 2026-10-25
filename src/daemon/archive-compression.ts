@@ -12,6 +12,7 @@ const STORED_EXTENSIONS = new Set([
   ".m4a",
   ".mp3",
   ".ogg",
+  ".flac",
   ".mp4",
   ".mov",
   ".webm",

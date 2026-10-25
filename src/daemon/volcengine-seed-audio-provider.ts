@@ -92,7 +92,7 @@ export class VolcengineSeedAudioProvider implements AudioProviderAdapter {
 
     validateRequest(input);
     const requestId = randomUUID();
-    const format = input.output?.format ?? "mp3";
+    const format = input.output?.format === "wav" ? ("wav" as const) : ("mp3" as const);
     const sampleRate = input.output?.sampleRate ?? 48_000;
     const textPrompt = providerPrompt(input);
     if (textPrompt.length > MAX_PROMPT_CHARACTERS)
