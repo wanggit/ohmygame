@@ -83,6 +83,11 @@ trimming, the shared preview controls, encoding, and the Library record.
 [agent](playable-nodes/agent.md) describes agent context and tools.
 [vision](playable-nodes/vision.md) preserves the rationale for the redesign.
 
+[Casual game pipeline](casual-game-pipeline.md) is the stage-0 plan and task
+list for producing casual web games for overseas portals (channel strategy,
+per-game DoD, and the Go/No-Go gate); its machine-readable topic catalog is
+`config/casual-game-topics.json`.
+
 ## Contribution and repository policies
 
 | Document                                           | Purpose                                                                            |
