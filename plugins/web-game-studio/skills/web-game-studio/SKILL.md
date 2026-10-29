@@ -54,7 +54,7 @@ When the request already has one clear domain, use that specialist directly. For
 ## Runtime Defaults
 
 - Keep the current engine when modifying an existing game.
-- For a new 2D game, prefer Phaser with TypeScript and Vite unless the request calls for another stack or a smaller existing approach fits better.
+- For a new 2D game, prefer Phaser 4 with TypeScript and Vite unless the request calls for another stack or a smaller existing approach fits better.
 - For a new plain TypeScript 3D game, prefer Three.js.
 - Use React Three Fiber when the project already uses React or the user explicitly wants a React-hosted 3D scene.
 - Use raw Canvas or WebGL when the user asks for it or the game's small scope makes an engine unnecessary.

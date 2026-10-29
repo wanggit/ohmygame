@@ -170,7 +170,7 @@ avg session / 完局率 / rewarded 展示与转化 / revenue per 1000 plays /
 └── data/                         # 数据记录
 ```
 
-游戏技术栈约定：**Vite + TypeScript + Phaser 3**（与 OhMyGame Web Game 默认一致，
+游戏技术栈约定：**Vite + TypeScript + Phaser 4**（与 OhMyGame Web Game 默认一致，
 便于日后用 OhMyGame agent 迭代这些项目；D 组小游戏允许退化为纯 Canvas）。
 
 ## 七、A1 模板资产清单（2026-10-25 定稿，判定可用）

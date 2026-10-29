@@ -10,7 +10,7 @@ Use this skill for architecture decisions or cross-cutting changes. For focused 
 ## Choose The Runtime
 
 - Preserve the existing runtime for features and bug fixes unless it blocks the requested outcome.
-- Prefer Phaser for a new sprite, tilemap, arcade, tactics, or side-view 2D game.
+- Prefer Phaser 4 for a new sprite, tilemap, arcade, tactics, or side-view 2D game.
 - Prefer plain Three.js for a new imperative 3D runtime in TypeScript or Vite.
 - Prefer React Three Fiber only when React state and composition are genuine requirements.
 - Keep a working Canvas, Babylon.js, PlayCanvas, or custom runtime when the user or project has already chosen it.
