@@ -1,0 +1,18 @@
+{
+  "name": "game-playbook",
+  "version": "0.1.0",
+  "description": "Game business, design, and asset-sourcing playbooks: pre-launch market validation, post-launch metrics and unit economics, game design theory, and license-safe free asset acquisition.",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Game Playbook",
+    "shortDescription": "Validate, design, source, and measure games for profit.",
+    "longDescription": "Decision playbooks for game production: validate an idea's profit potential before building, apply design theory (MDA, flow, rewards, balance) while building, source free assets with a commercial-license gate, and judge post-launch metrics and unit economics with kill criteria.",
+    "defaultPrompt": [
+      "Evaluate whether this game idea can make money overseas: give a GO / NO-GO / PIVOT verdict with kill criteria.",
+      "Review this game's design: is the core loop fun, and where does the difficulty curve break?",
+      "Find free commercial-safe assets for this game and generate the credits file.",
+      "Analyze my post-launch metrics and tell me whether to keep investing in this game."
+    ],
+    "projectTypes": ["general", "web-game", "godot-game", "interactive-story"]
+  }
+}

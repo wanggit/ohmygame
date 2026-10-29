@@ -76,6 +76,24 @@ describe("bundled plugins", () => {
     });
   });
 
+  it("loads the built-in Game Playbook decision skills", async () => {
+    const store = new BundledPluginStore(path.resolve("plugins"));
+    await store.load();
+
+    expect(store.read("ohmygame:game-playbook")).toMatchObject({
+      displayName: "Game Playbook",
+      enabled: true,
+      projectTypes: ["general", "web-game", "godot-game", "interactive-story"],
+      skills: [
+        { id: "skills/game-asset-sourcing/SKILL.md", name: "Game Asset Sourcing" },
+        { id: "skills/game-design-theory/SKILL.md", name: "Game Design Theory" },
+        { id: "skills/game-market-validation/SKILL.md", name: "Game Market Validation" },
+        { id: "skills/game-metrics-unit-economics/SKILL.md", name: "Game Metrics Unit Economics" },
+      ],
+      connections: [],
+    });
+  });
+
   it("loads the built-in Three.js World skill", async () => {
     const store = new BundledPluginStore(path.resolve("plugins"));
 
