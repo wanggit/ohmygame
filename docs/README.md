@@ -124,6 +124,29 @@ guidance in [CONTRIBUTING.md](../CONTRIBUTING.md#make-and-check-your-change).
   [Three.js](../plugins/web-game-studio/skills/three-webgl-game/SKILL.md),
   [Sprite Pipeline](../plugins/web-game-studio/skills/sprite-pipeline/SKILL.md),
   and [Web 3D Assets](../plugins/web-game-studio/skills/web-3d-asset-pipeline/SKILL.md).
+  [Phaser 2D](../plugins/web-game-studio/skills/phaser-2d-game/SKILL.md) is the
+  entry point for 18 Phaser 4 subsystem skills routed from its task table:
+  [game setup](../plugins/web-game-studio/skills/phaser-game-setup-and-config/SKILL.md),
+  [scenes](../plugins/web-game-studio/skills/phaser-scenes/SKILL.md),
+  [asset loading](../plugins/web-game-studio/skills/phaser-loading-assets/SKILL.md),
+  [input](../plugins/web-game-studio/skills/phaser-input-keyboard-mouse-touch/SKILL.md),
+  [physics](../plugins/web-game-studio/skills/phaser-physics/SKILL.md),
+  [tweens](../plugins/web-game-studio/skills/phaser-tweens/SKILL.md),
+  [particles](../plugins/web-game-studio/skills/phaser-particles/SKILL.md),
+  [filters and FX](../plugins/web-game-studio/skills/phaser-fx/SKILL.md),
+  [tilemaps](../plugins/web-game-studio/skills/phaser-tilemap/SKILL.md),
+  [UI](../plugins/web-game-studio/skills/phaser-ui/SKILL.md),
+  [audio](../plugins/web-game-studio/skills/phaser-audio-and-sound/SKILL.md),
+  [render textures](../plugins/web-game-studio/skills/phaser-render-textures/SKILL.md),
+  [save and load](../plugins/web-game-studio/skills/phaser-saveload/SKILL.md),
+  [responsive scaling](../plugins/web-game-studio/skills/phaser-scale-and-responsive/SKILL.md),
+  [mobile](../plugins/web-game-studio/skills/phaser-mobile/SKILL.md),
+  [data manager](../plugins/web-game-studio/skills/phaser-data-manager/SKILL.md),
+  [Phaser 4 features](../plugins/web-game-studio/skills/phaser-v4-new-features/SKILL.md),
+  and [v3 to v4 migration](../plugins/web-game-studio/skills/phaser-v3-to-v4-migration/SKILL.md).
+  These subsystem skills are redistributed third-party work; see the
+  [Web Game Studio notices](../plugins/web-game-studio/NOTICE.md) for sources
+  and licenses.
 - [Three.js World](../plugins/threejs-world/skills/threejs-world/SKILL.md) and
   its references: [world contract](../plugins/threejs-world/skills/threejs-world/references/world-contract.md),
   [world expansion](../plugins/threejs-world/skills/threejs-world/references/world-expansion.md),

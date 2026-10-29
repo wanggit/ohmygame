@@ -18,7 +18,7 @@ describe("plugin runtime", () => {
     expect(general.filter((skill) => skill.pluginDisplayName === "Game Studio")).toHaveLength(3);
     expect(general.filter((skill) => skill.pluginDisplayName === "Game Playbook")).toHaveLength(4);
     expect(general.some((skill) => skill.pluginDisplayName === "Web Game Studio")).toBe(false);
-    expect(webBefore.filter((skill) => skill.pluginDisplayName === "Web Game Studio")).toHaveLength(9);
+    expect(webBefore.filter((skill) => skill.pluginDisplayName === "Web Game Studio")).toHaveLength(27);
     expect(webBefore.some((skill) => skill.pluginDisplayName === "Game Studio")).toBe(false);
 
     const plugin = store.read("ohmygame:game-studio")!;
