@@ -4,6 +4,13 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, verification, formatting, and
 the contribution workflow. [docs/README.md](docs/README.md) maps modules to
 their code, documentation, and tests.
 
+## 项目定位（Project Positioning）
+
+- **OhMyGame 是作者本人用来快速开发游戏的工具**——个人 game studio 的 AI 生产线。
+- **通过 OhMyGame 开发的游戏，优先发布到自建游戏站点**（聚合站+广告变现），不依赖第三方门户。
+- **OhMyGame 本身先打磨、后获利**：在工具打磨到非常成熟（稳定产出高质量游戏）之前，不考虑通过工具本身获利（如 SaaS/付费版/抽成）。当前阶段的所有投入都服务于"用工具做游戏、发布到自建站"这一主线。
+- 由此派生的决策取舍：**优先做"让作者更快做出更好游戏"的功能**，而非"让工具更易售卖"的功能。
+
 ## Git
 
 - Keep PRs focused on one feature, bug fix, documentation change, chore, or refactor.
