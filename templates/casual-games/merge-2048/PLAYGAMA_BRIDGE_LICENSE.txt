@@ -1,0 +1,19 @@
+Juice Sort bundles the Playgama Bridge ("@playgama/bridge") in its build output.
+
+Playgama Bridge is free software licensed under the GNU Lesser General
+Public License v3.0 (LGPL-3.0).
+
+Copyright (c) Playgama and its contributors.
+
+This distribution includes the library as received from the npm package
+"@playgama/bridge" (unmodified, bundled by Vite). You may redistribute and/or
+modify the library under the terms of the LGPL-3.0. The complete source code
+of the library is available from its npm package page and repository:
+https://github.com/playgama/bridge
+
+A copy of the LGPL-3.0 license text ships with the npm package at
+node_modules/@playgama/bridge/LICENSE and should accompany redistributed
+builds of this game.
+
+This game's own code (src/, excluding the bundled library) is separate from
+the library and not subject to the LGPL.

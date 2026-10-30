@@ -1,0 +1,23 @@
+{
+  "name": "juice-sort",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "verify": "bun scripts/verify.ts",
+    "measure": "bun scripts/measure.ts",
+    "smoke": "bun scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@playgama/bridge": "^2.3.1",
+    "phaser": "3"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  }
+}
