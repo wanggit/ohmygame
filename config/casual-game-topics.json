@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-10-25",
+  "updated": "2026-10-30",
   "doc": "docs/casual-game-pipeline.md",
   "goal": {
     "count": 10,
@@ -43,6 +43,78 @@
     "configFile": "playgama-bridge-config.json"
   },
   "dodRef": "docs/casual-game-pipeline.md#二每款最小验收标准-dod",
+  "mechanicsMatrix": {
+    "updated": "2026-10-30",
+    "policy": "选品硬边界：只做被玩家广泛接纳的'一看就会'玩法。发布硬门：3 秒测试 + 复合判定禁令（单局 1 种操作原语 tap/drag/swipe/timing + 至多 1 个风险回报维度）。详见 docs/casual-game-pipeline.md 第一/二节。",
+    "t0": [
+      {
+        "mechanic": "sort",
+        "prototype": "water-sort",
+        "coveredBy": ["A1", "A2", "A3"],
+        "status": "covered"
+      },
+      {
+        "mechanic": "merge-2048",
+        "prototype": "merge-2048",
+        "coveredBy": ["B1", "B2"],
+        "status": "covered"
+      },
+      {
+        "mechanic": "blast-clear",
+        "prototype": "blast-clear",
+        "coveredBy": ["G1"],
+        "status": "gap-first-priority"
+      },
+      {
+        "mechanic": "one-tap-timing",
+        "prototype": "one-tap-timing",
+        "coveredBy": ["G2"],
+        "status": "gap-first-priority"
+      },
+      {
+        "mechanic": "match-3",
+        "prototype": null,
+        "coveredBy": [],
+        "status": "excluded",
+        "reason": "Royal Match/Candy Crush 买量碾压，独立开发无胜算"
+      }
+    ],
+    "t1": [
+      {
+        "mechanic": "stacking",
+        "prototype": "one-tap",
+        "coveredBy": ["D2"],
+        "status": "covered"
+      },
+      {
+        "mechanic": "slice",
+        "prototype": "one-tap",
+        "coveredBy": ["D1"],
+        "status": "covered"
+      },
+      {
+        "mechanic": "chain-reaction",
+        "prototype": "chain-reaction",
+        "coveredBy": ["E1"],
+        "status": "covered"
+      },
+      {
+        "mechanic": "physics-flip",
+        "prototype": "physics-flip",
+        "coveredBy": ["F1"],
+        "status": "high-risk",
+        "reason": "复合判定违反质量门；先 2-3 天原型验手感"
+      }
+    ],
+    "demoted": [
+      {
+        "mechanic": "idle-clicker",
+        "prototype": "idle-clicker",
+        "coveredBy": ["C1", "C2"],
+        "reason": "非'一看就会'型；留存依赖 meta 层，1-2 天做不出留存钩子"
+      }
+    ]
+  },
   "topics": [
     {
       "id": "A1",
@@ -50,20 +122,14 @@
       "theme": "fruit-juice",
       "title": "Juice Sort: Color Water Puzzle",
       "genre": "puzzle",
-      "tags": [
-        "water sort",
-        "color sort",
-        "juice",
-        "puzzle",
-        "casual"
-      ],
+      "tags": ["water sort", "color sort", "juice", "puzzle", "casual"],
       "description": "Pour and sort colorful fruit juices into matching glasses. Relaxing one-tap color sorting puzzles.",
       "monetization": {
         "rewarded": "hint (auto-pour one step)",
         "interstitial": "every 5 levels"
       },
       "projectPath": "~/projects/casual-games/juice-sort",
-      "status": "planned"
+      "status": "done"
     },
     {
       "id": "A2",
@@ -71,13 +137,7 @@
       "theme": "potion-lab",
       "title": "Potion Sort: Magic Lab Puzzle",
       "genre": "puzzle",
-      "tags": [
-        "water sort",
-        "potion",
-        "magic",
-        "puzzle",
-        "casual"
-      ],
+      "tags": ["water sort", "potion", "magic", "puzzle", "casual"],
       "description": "Mix and sort magical potions in your alchemy lab. A relaxing color sorting challenge.",
       "monetization": {
         "rewarded": "hint (auto-pour one step)",
@@ -89,23 +149,17 @@
     {
       "id": "A3",
       "prototype": "water-sort",
-      "theme": "gem-magic",
-      "title": "Gem Sort: Crystal Water Puzzle",
+      "theme": "crayon-stationery",
+      "title": "Crayon Sort: Color Box Puzzle",
       "genre": "puzzle",
-      "tags": [
-        "water sort",
-        "gems",
-        "crystal",
-        "puzzle",
-        "casual"
-      ],
-      "description": "Sort sparkling crystal liquids by color. Satisfying puzzles with a magical gem theme.",
+      "tags": ["water sort", "crayon", "color sort", "puzzle", "casual"],
+      "description": "Sort scattered crayons by color back into the pencil box. Tidy stationery, satisfying order.",
       "monetization": {
         "rewarded": "hint (auto-pour one step)",
         "interstitial": "every 5 levels"
       },
-      "projectPath": "~/projects/casual-games/gem-sort",
-      "status": "planned"
+      "projectPath": "~/projects/casual-games/crayon-sort",
+      "status": "done"
     },
     {
       "id": "B1",
@@ -113,41 +167,29 @@
       "theme": "fruit-merge",
       "title": "Fruit Merge: 2048 Harvest",
       "genre": "puzzle",
-      "tags": [
-        "merge",
-        "2048",
-        "fruit",
-        "puzzle",
-        "casual"
-      ],
+      "tags": ["merge", "2048", "fruit", "puzzle", "casual"],
       "description": "Merge identical fruits and harvest your way to the golden crop. A juicy twist on 2048.",
       "monetization": {
         "rewarded": "undo / board boost",
         "interstitial": "every 3 minutes"
       },
       "projectPath": "~/projects/casual-games/fruit-merge",
-      "status": "prototype-done"
+      "status": "done"
     },
     {
       "id": "B2",
       "prototype": "merge-2048",
-      "theme": "monster-evolution",
-      "title": "Monster Merge: Evolution 2048",
+      "theme": "number-alchemy",
+      "title": "Number Alchemy",
       "genre": "puzzle",
-      "tags": [
-        "merge",
-        "2048",
-        "monster",
-        "evolution",
-        "casual"
-      ],
-      "description": "Merge tiny monsters into mighty legends. Cute creatures, simple rules, endless evolution.",
+      "tags": ["merge", "2048", "numbers", "alchemy", "casual"],
+      "description": "Transmute numbers through the alchemy of merging. Low numbers combine into the Philosopher's Stone.",
       "monetization": {
         "rewarded": "undo / board boost",
         "interstitial": "every 3 minutes"
       },
-      "projectPath": "~/projects/casual-games/monster-merge",
-      "status": "planned"
+      "projectPath": "~/projects/casual-games/number-alchemy",
+      "status": "done"
     },
     {
       "id": "B3",
@@ -155,13 +197,7 @@
       "theme": "number-space",
       "title": "Star 2048: Number Galaxy",
       "genre": "puzzle",
-      "tags": [
-        "2048",
-        "numbers",
-        "space",
-        "puzzle",
-        "casual"
-      ],
+      "tags": ["2048", "numbers", "space", "puzzle", "casual"],
       "description": "Slide and merge number blocks across a glowing galaxy. The classic 2048 with cosmic style.",
       "monetization": {
         "rewarded": "undo / board boost",
@@ -176,20 +212,15 @@
       "theme": "cafe",
       "title": "Idle Coffee Shop",
       "genre": "idle",
-      "tags": [
-        "idle",
-        "clicker",
-        "cafe",
-        "tycoon",
-        "casual"
-      ],
+      "tags": ["idle", "clicker", "cafe", "tycoon", "casual"],
       "description": "Brew, serve, and grow your cozy coffee shop empire. Tap to earn, upgrade to grow, idle to relax.",
       "monetization": {
         "rewarded": "offline earnings x2",
         "interstitial": "natural pause points"
       },
       "projectPath": "~/projects/casual-games/idle-coffee",
-      "status": "planned"
+      "status": "demoted",
+      "note": "2026-10-30 降级出池：Idle 非'一看就会'型，留存依赖 meta 层，1-2 天做不出留存钩子；名额让给 T0 缺口玩法（G1/G2）"
     },
     {
       "id": "C2",
@@ -197,20 +228,15 @@
       "theme": "space-station",
       "title": "Idle Space Station",
       "genre": "idle",
-      "tags": [
-        "idle",
-        "clicker",
-        "space",
-        "tycoon",
-        "casual"
-      ],
+      "tags": ["idle", "clicker", "space", "tycoon", "casual"],
       "description": "Build and upgrade your own space station among the stars. Idle income that is out of this world.",
       "monetization": {
         "rewarded": "offline earnings x2",
         "interstitial": "natural pause points"
       },
       "projectPath": "~/projects/casual-games/idle-space",
-      "status": "planned"
+      "status": "demoted",
+      "note": "2026-10-30 降级出池：同 C1"
     },
     {
       "id": "D1",
@@ -218,20 +244,14 @@
       "theme": "asmr-slice",
       "title": "Satisfying Slice: ASMR Cutter",
       "genre": "hypercasual",
-      "tags": [
-        "asmr",
-        "satisfying",
-        "slice",
-        "hypercasual",
-        "casual"
-      ],
+      "tags": ["asmr", "satisfying", "slice", "hypercasual", "casual"],
       "description": "One tap, perfect slices. Satisfying ASMR cutting with smooth physics and juicy visuals.",
       "monetization": {
         "rewarded": "revive / perfect bonus",
         "interstitial": "end of each run"
       },
       "projectPath": "~/projects/casual-games/satisfying-slice",
-      "status": "planned"
+      "status": "in-progress"
     },
     {
       "id": "D2",
@@ -239,12 +259,7 @@
       "theme": "stack-balance",
       "title": "Tower Balance: Stack It!",
       "genre": "hypercasual",
-      "tags": [
-        "stack",
-        "balance",
-        "hypercasual",
-        "casual"
-      ],
+      "tags": ["stack", "balance", "hypercasual", "casual"],
       "description": "Tap to drop, stack to the sky. Simple to play, tricky to master. How high can you build?",
       "monetization": {
         "rewarded": "revive / perfect bonus",
@@ -252,6 +267,70 @@
       },
       "projectPath": "~/projects/casual-games/tower-balance",
       "status": "planned"
+    },
+    {
+      "id": "E1",
+      "prototype": "chain-reaction",
+      "theme": "color-cascade",
+      "title": "Chain Reaction: Color Cascade",
+      "genre": "puzzle",
+      "tags": ["chain reaction", "blast", "color", "puzzle", "casual"],
+      "description": "Drop one ball to trigger a full-screen chain explosion. One tap, explosive satisfying cascades.",
+      "monetization": {
+        "rewarded": "revive / extra ball",
+        "interstitial": "end of each run"
+      },
+      "projectPath": "~/projects/casual-games/chain-reaction",
+      "status": "planned"
+    },
+    {
+      "id": "F1",
+      "prototype": "physics-flip",
+      "theme": "bottle-flip",
+      "title": "Flip Bottle: Physics Toss",
+      "genre": "hypercasual",
+      "tags": ["flip", "physics", "bottle", "hypercasual", "casual"],
+      "description": "Flip a water bottle and land it upright. Physics-based toss with rising stakes.",
+      "monetization": {
+        "rewarded": "revive / extra toss",
+        "interstitial": "end of each run"
+      },
+      "projectPath": "~/projects/casual-games/flip-bottle",
+      "status": "planned",
+      "risk": "high",
+      "riskNote": "复合判定（蓄力+翻转圈数+落点精度）违反质量门；先 2-3 天原型验手感，必要时砍到单判定极简版"
+    },
+    {
+      "id": "G1",
+      "prototype": "blast-clear",
+      "theme": "tbd",
+      "title": "Blast Pop: Tap to Clear",
+      "genre": "puzzle",
+      "tags": ["blast", "tap", "clear", "puzzle", "casual"],
+      "description": "Tap groups of same-colored blocks to clear the board. Zero-learning-curve satisfying pops.",
+      "monetization": {
+        "rewarded": "shuffle / extra moves",
+        "interstitial": "every 5 levels"
+      },
+      "projectPath": "~/projects/casual-games/blast-pop",
+      "status": "planned",
+      "note": "2026-10-30 新增，补 T0 Blast 缺口；实现成本最低。题材与标题选题时定稿"
+    },
+    {
+      "id": "G2",
+      "prototype": "one-tap-timing",
+      "theme": "tbd",
+      "title": "Perfect Tap: Timing Challenge",
+      "genre": "hypercasual",
+      "tags": ["timing", "one-tap", "hypercasual", "casual"],
+      "description": "Tap at the perfect moment. One button, endless precision challenges.",
+      "monetization": {
+        "rewarded": "revive / perfect bonus",
+        "interstitial": "end of each run"
+      },
+      "projectPath": "~/projects/casual-games/perfect-tap",
+      "status": "planned",
+      "note": "2026-10-30 新增，补 T0 One-tap timing 缺口；规则零门槛。题材与标题选题时定稿"
     }
   ]
 }
