@@ -23,4 +23,16 @@ describe("project create dialog", () => {
     const html = renderToStaticMarkup(<ProjectCreateDialog projectTypes={GAME_PROJECT_TYPES} onClose={() => undefined} onCreated={() => undefined} />);
     expect(html).not.toContain("Asset Canvas");
   });
+
+  it("does not offer the hidden Godot Game and General Game types", () => {
+    const html = renderToStaticMarkup(<ProjectCreateDialog onClose={() => undefined} onCreated={() => undefined} />);
+    expect(html).not.toContain("Godot");
+    expect(html).not.toContain("General Game");
+  });
+
+  it("falls back to a selectable type when asked for a hidden one", () => {
+    const html = renderToStaticMarkup(<ProjectCreateDialog initialType="godot-game" onClose={() => undefined} onCreated={() => undefined} />);
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).not.toContain("Godot");
+  });
 });

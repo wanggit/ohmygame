@@ -7,13 +7,19 @@ describe("project types", () => {
       { label: "Web Game", value: "web-game" },
       { label: "Interactive Story", value: "interactive-story" },
       { label: "Asset Canvas", value: "asset-canvas" },
-      { label: "Godot", value: "godot-game" },
-      { label: "General Game", value: "general" },
     ]);
   });
 
   it("keeps Asset Canvas out of the home game types", () => {
-    expect(GAME_PROJECT_TYPES.map(({ value }) => value)).toEqual(["web-game", "interactive-story", "godot-game", "general"]);
+    expect(GAME_PROJECT_TYPES.map(({ value }) => value)).toEqual(["web-game", "interactive-story"]);
+  });
+
+  it("hides Godot Game and General Game from the UI while keeping their labels", () => {
+    expect(PROJECT_TYPES.map(({ value }) => value)).not.toContain("godot-game");
+    expect(PROJECT_TYPES.map(({ value }) => value)).not.toContain("general");
+    // Existing projects of hidden types still label themselves correctly.
+    expect(projectTypeLabel("godot-game")).toBe("Godot");
+    expect(projectTypeLabel("general")).toBe("General Game");
   });
 
   it("provides labels and default names", () => {

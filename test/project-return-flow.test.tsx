@@ -8,7 +8,7 @@ import type { ProjectState } from "../src/shared/contracts.js";
 const project: ProjectState = {
   id: "garden",
   name: "Garden",
-  type: "general",
+  type: "web-game",
   workspacePath: "/tmp/garden",
   updatedAt: "2026-10-14T00:00:00Z",
   preview: { status: "stopped" },
@@ -131,7 +131,7 @@ describe("project return flow", () => {
   );
 
   it("restores the actual list controls after editing filters, entering a project, and refreshing", async () => {
-    window.history.replaceState(null, "", "#/projects?type=general");
+    window.history.replaceState(null, "", "#/projects?type=web-game");
     await act(async () => root.render(<App />));
     const input = container.querySelector<HTMLInputElement>(
       "#projects-search-input",
@@ -150,7 +150,7 @@ describe("project return flow", () => {
     );
     await click("Name");
     const entry = window.location.hash;
-    expect(entry).toBe("#/projects?type=general&q=Garden&sort=name");
+    expect(entry).toBe("#/projects?type=web-game&q=Garden&sort=name");
     await click("Open Garden");
     await click("Another conversation");
     await click("Design");
@@ -166,7 +166,7 @@ describe("project return flow", () => {
     expect(
       container.querySelector<HTMLSelectElement>('[aria-label="Project type"]')!
         .value,
-    ).toBe("general");
+    ).toBe("web-game");
     await act(async () =>
       container
         .querySelector<HTMLButtonElement>('[aria-label="Sort projects"]')!

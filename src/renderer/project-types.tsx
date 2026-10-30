@@ -9,10 +9,15 @@ export interface ProjectTypeOption {
 }
 
 
-export const PROJECT_TYPES: readonly ProjectTypeOption[] = [
-  ...PROJECT_TYPE_IDS.filter((value) => value !== "general"),
-  "general" as const,
-].map((value) => ({ value, label: projectTypeLabel(value) }));
+/**
+ * Godot Game and General Game stay supported in the contracts and keep working
+ * for existing projects, but are no longer offered anywhere in the UI.
+ */
+const HIDDEN_PROJECT_TYPES = new Set<ProjectType>(["godot-game", "general"]);
+
+export const PROJECT_TYPES: readonly ProjectTypeOption[] = PROJECT_TYPE_IDS
+  .filter((value) => !HIDDEN_PROJECT_TYPES.has(value))
+  .map((value) => ({ value, label: projectTypeLabel(value) }));
 
 export const GAME_PROJECT_TYPES: readonly ProjectTypeOption[] = PROJECT_TYPES.filter(({ value }) => value !== "asset-canvas");
 

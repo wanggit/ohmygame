@@ -18,7 +18,9 @@ export function ProjectCreateDialog({ initialType = "web-game", fixedType, proje
   const creatingRef = useRef(false);
   const onCloseRef = useRef(onClose);
   const [name, setName] = useState("");
-  const [type, setType] = useState<ProjectType>(fixedType ?? initialType);
+  // A stale link can still request a type the UI no longer offers (Godot Game,
+  // General Game); fall back to the first selectable type in that case.
+  const [type, setType] = useState<ProjectType>(fixedType ?? (projectTypes.some((option) => option.value === initialType) ? initialType : projectTypes[0]!.value));
   const [workspacePath, setWorkspacePath] = useState<string>();
   const [selectingWorkspace, setSelectingWorkspace] = useState(false);
   const [creating, setCreating] = useState(false);
