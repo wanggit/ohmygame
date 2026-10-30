@@ -705,6 +705,10 @@ const zhCN: typeof en = {
     chooseAnother: "选择其他文件夹…",
     chooseFolder: "选择文件夹…",
     projectType: "项目类型",
+    gameMechanic: "游戏玩法",
+    chooseMechanic: "选择游戏玩法",
+    mechanicRequired: "请先选择游戏玩法，再开始做新游戏。",
+    gameMechanicMenu: "游戏玩法列表",
   },
   createDialog: {
     restartForFolders: "请重启 OhMyGame 桌面应用以启用文件夹选择。",

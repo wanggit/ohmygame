@@ -724,6 +724,10 @@ const en = {
     chooseAnother: "Choose another folder…",
     chooseFolder: "Choose folder…",
     projectType: "Project type",
+    gameMechanic: "Game mechanic",
+    chooseMechanic: "Choose mechanic",
+    mechanicRequired: "Choose a game mechanic before creating the game.",
+    gameMechanicMenu: "Game mechanic list",
   },
   createDialog: {
     restartForFolders:

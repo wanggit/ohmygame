@@ -3298,6 +3298,16 @@ button.home-nav-item-active:hover {
   color: var(--text);
 }
 
+.home-mechanic-placeholder {
+  color: var(--text-muted);
+}
+
+.home-mechanic-menu {
+  width: 240px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
 .home-workspace-trigger > span {
   max-width: 140px;
   overflow: hidden;

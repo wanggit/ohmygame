@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Folder, FolderOpen, FolderPlus, LoaderCircle, SendArrow } from "./icons.js";
+import { Check, ChevronDown, Folder, FolderOpen, FolderPlus, Gamepad2, LoaderCircle, SendArrow } from "./icons.js";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import type { AgentModel, AgentModelRef, AgentReasoningLevel, ConversationCapabilities, PluginMention, ProjectState, ProjectType, PromptAttachment, PromptImage, PromptMode } from "../shared/contracts.js";
 import { clampReasoningLevel } from "../shared/reasoning.js";
@@ -10,6 +10,7 @@ import { ModelSelector, useAgentModels } from "./model-selector.js";
 import { matchesPlanCommand, PlanModeIndicator } from "./plan-mode-control.js";
 import { PromptBox, type DroppedFile } from "./prompt-box.js";
 import { PROJECT_TYPES, ProjectTypeIcon, type ProjectTypeOption } from "./project-types.js";
+import { CASUAL_MECHANICS, casualMechanicLabel, mechanicCreationBrief, type CasualMechanic } from "../shared/casual-mechanics.js";
 import { useComposerContextMenu } from "./composer-context-menu.js";
 import { activePluginMentions, extractLeadingPluginMention, formatComposerInvocation, formatSkillInvocation, insertMention, parseSkillInvocation, toPluginMention, type ComposerMention, type ComposerMentionQuery } from "./composer-mentions.js";
 import { createPromptHistory, loadHomePromptHistory, nextPrompt, previousPrompt, saveHomePrompt } from "./prompt-history.js";
@@ -43,6 +44,8 @@ export function ProjectPromptCreator({ projectType, projectTypes = PROJECT_TYPES
   const [nativeReasoningLevel, setNativeReasoningLevel] = useState<string>();
   // Always starts as a new managed folder: remembering an external folder would point every new project at it.
   const [workspacePath, setWorkspacePath] = useState<string>();
+  // Required for web games: every new game starts from a chosen playbook mechanic.
+  const [mechanic, setMechanic] = useState<CasualMechanic>();
   const [selectingWorkspace, setSelectingWorkspace] = useState(false);
   const [existingProject, setExistingProject] = useState<ProjectState>();
   const selectDirectory = window.ohMyGameDesktop?.selectProjectDirectory;
@@ -94,6 +97,10 @@ export function ProjectPromptCreator({ projectType, projectTypes = PROJECT_TYPES
     }
     const submittedPrompt = formatComposerInvocation(selectedSkill, selectedPlugin, prompt.trim());
     if ((!submittedPrompt && attachments.length === 0) || creating) return;
+    if (projectType === "web-game" && !mechanic) {
+      setError(t("creator.mechanicRequired"));
+      return;
+    }
     setCreating(true);
     setError(undefined);
     try {
@@ -108,7 +115,7 @@ export function ProjectPromptCreator({ projectType, projectTypes = PROJECT_TYPES
       onCreate(
         project,
         created.current.conversationId,
-        submittedPrompt,
+        mechanic ? mechanicCreationBrief(mechanic, submittedPrompt) : submittedPrompt,
         submittedMentions,
         [],
         planning ? "planning" : "normal",
@@ -340,6 +347,7 @@ export function ProjectPromptCreator({ projectType, projectTypes = PROJECT_TYPES
               />
             ) : null}
             {onProjectTypeChange ? <ProjectTypeSelector disabled={creating} value={projectType} options={projectTypes} onChange={onProjectTypeChange} /> : null}
+            {projectType === "web-game" ? <MechanicSelector disabled={creating} value={mechanic} onChange={setMechanic} /> : null}
             {planning ? <PlanModeIndicator disabled={creating} onExit={() => togglePlanning()} /> : null}
           </>
         )}
@@ -597,6 +605,101 @@ function ProjectTypeSelector({ value, options, disabled, onChange }: {
               >
                 <ProjectTypeIcon type={option.value} />
                 <span>{option.label}</span>
+                {selected ? <Check size={13} aria-hidden="true" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MechanicSelector({ value, disabled, onChange }: {
+  value?: CasualMechanic;
+  disabled?: boolean;
+  onChange: (value: CasualMechanic) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpen(false);
+      trigger.current?.focus();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
+  useEffect(() => {
+    if (open) menu.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
+  }, [open]);
+
+  return (
+    <div className="home-project-type-selector" ref={root}>
+      <button
+        ref={trigger}
+        className={value ? "home-project-type-trigger" : "home-project-type-trigger home-mechanic-placeholder"}
+        type="button"
+        aria-controls={menuId}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        disabled={disabled}
+        onClick={() => setOpen((currentOpen) => !currentOpen)}
+      >
+        <Gamepad2 size={14} aria-hidden="true" />
+        <span>{value ? casualMechanicLabel(value) : t("creator.chooseMechanic")}</span>
+        <ChevronDown size={12} aria-hidden="true" />
+      </button>
+
+      {open ? (
+        <div
+          ref={menu}
+          className="home-project-type-menu home-mechanic-menu"
+          id={menuId}
+          role="menu"
+          aria-label={t("creator.gameMechanicMenu")}
+          onKeyDown={(event) => {
+            if (event.key === "Tab") {
+              setOpen(false);
+              return;
+            }
+            if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')];
+            const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+            const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (currentIndex + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+            items[nextIndex]?.focus();
+          }}
+        >
+          {CASUAL_MECHANICS.map((option) => {
+            const selected = option.id === value?.id;
+            return (
+              <button className={selected ? "is-active" : undefined} type="button" role="menuitemradio" aria-checked={selected} key={option.id} onClick={() => {
+                onChange(option);
+                setOpen(false);
+                trigger.current?.focus();
+              }}>
+                <Gamepad2 size={14} aria-hidden="true" />
+                <span>{casualMechanicLabel(option)}</span>
                 {selected ? <Check size={13} aria-hidden="true" /> : null}
               </button>
             );
