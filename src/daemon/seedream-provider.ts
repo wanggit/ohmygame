@@ -20,7 +20,9 @@ export class SeedreamProvider {
       throw new ImageGenerationError("Image resolution and aspect ratio are required for Seedream", 400);
     }
     const requestOptions = seedreamRequestOptions(model.id, input.resolution, input.aspectRatio)
-      ?? (model.generationOptions.some((option) => option.resolution === input.resolution && option.aspectRatio === input.aspectRatio) ? { size: openAIImageSize(input) } : undefined);
+      ?? (model.generationOptions.some((option) => option.resolution === input.resolution && option.aspectRatio === input.aspectRatio)
+        ? { size: model.sizeFormat === "resolution" ? input.resolution : openAIImageSize(input) }
+        : undefined);
     if (!requestOptions) throw new ImageGenerationError("Image resolution and aspect ratio are not supported by the selected model", 400);
     const images = input.images ?? [];
     if (images.length > (model.maxReferenceImages ?? 0)) {

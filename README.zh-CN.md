@@ -149,8 +149,8 @@ OhMyGame 不会把你绑定在某一个模型上，也不按次收费。
 - **你已经在用的编程智能体**：Claude Code、Codex 和 OpenCode 使用各自的登录来运行对话，
   对话记录、撤销、画布、媒体工具和插件仍由 OhMyGame 提供。在设置中启用，并遵循原生 CLI
   的权限边界。详见[编程智能体](docs/coding-agents.md)。
-- **媒体模型**：图片、视频和 3D 生成，可通过 OpenAI、OpenRouter、火山方舟 / BytePlus ModelArk
-  和 Meshy 接入。
+- **媒体模型**：图片、视频和 3D 生成，可通过 OpenAI、OpenRouter、火山方舟 / BytePlus ModelArk（含
+  Agent Plan 订阅套餐）和 Meshy 接入。
 - **自定义服务商和模型别名**：可以选择语言、图片、视频和 3D 用途，配置协议模板和生成默认值。
   详见[自定义模型配置](docs/custom-models.md)。
 
@@ -187,8 +187,8 @@ OhMyGame 不内置模型。首次启动时，一个小小的游戏世界逐渐�
    | 想做的东西              | 需要连接                                                       |
    | ----------------------- | -------------------------------------------------------------- |
    | 设计文档、代码、试玩    | 任意语言模型服务商                                             |
-   | 图片和精灵图            | Codex CLI（本机登录）、OpenAI（API 密钥）、OpenRouter，或火山方舟 / BytePlus ModelArk |
-   | 视频                    | OpenRouter，或火山方舟 / BytePlus ModelArk                     |
+   | 图片和精灵图            | Codex CLI（本机登录）、OpenAI（API 密钥）、OpenRouter，或火山方舟 / BytePlus ModelArk（含 Agent Plan） |
+   | 视频                    | OpenRouter，或火山方舟 / BytePlus ModelArk（含 Agent Plan）        |
    | 3D 模型、骨骼绑定、动画 | Meshy、Tripo 或 Hyper3D（各服务商支持的能力不同）               |
 
    **Codex CLI** 图片服务商使用本机 Codex 登录和账户额度。可在画布中选择

@@ -1,12 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { AUDIO_VOICE_ID_MAX_LENGTH, AUDIO_VOICE_ID_PATTERN, DOUBAO_SPEECH_PROVIDER_NAME } from "../shared/audio.js";
+import {
+  AUDIO_VOICE_ID_MAX_LENGTH,
+  AUDIO_VOICE_ID_PATTERN,
+  DOUBAO_SPEECH_PROVIDER_NAME,
+  type VolcengineTtsEndpoint,
+} from "../shared/audio.js";
+
+const ENDPOINTS: readonly VolcengineTtsEndpoint[] = ["standard", "agent-plan"];
 
 interface StoredVolcengineTtsSettings {
   version: 1;
   apiKey?: string;
   defaultVoiceId?: string;
+  endpoint?: VolcengineTtsEndpoint;
 }
 
 export class VolcengineTtsSettingsStore {
@@ -33,17 +41,28 @@ export class VolcengineTtsSettingsStore {
         ...(typeof parsed.defaultVoiceId === "string" && parsed.defaultVoiceId
           ? { defaultVoiceId: parsed.defaultVoiceId }
           : {}),
+        ...(typeof parsed.endpoint === "string" &&
+        (ENDPOINTS as readonly string[]).includes(parsed.endpoint)
+          ? { endpoint: parsed.endpoint as VolcengineTtsEndpoint }
+          : {}),
       };
     } catch (cause) {
       if ((cause as NodeJS.ErrnoException).code !== "ENOENT") throw cause;
     }
   }
 
-  get(): { configured: boolean; defaultVoiceId?: string } {
+  get(): {
+    configured: boolean;
+    defaultVoiceId?: string;
+    endpoint?: VolcengineTtsEndpoint;
+  } {
     return {
       configured: Boolean(this.#settings.apiKey),
       ...(this.#settings.defaultVoiceId
         ? { defaultVoiceId: this.#settings.defaultVoiceId }
+        : {}),
+      ...(this.#settings.endpoint
+        ? { endpoint: this.#settings.endpoint }
         : {}),
     };
   }
@@ -53,11 +72,19 @@ export class VolcengineTtsSettingsStore {
   defaultVoiceId(): string | undefined {
     return this.#settings.defaultVoiceId;
   }
+  endpoint(): VolcengineTtsEndpoint {
+    return this.#settings.endpoint ?? "standard";
+  }
 
   async update(
     apiKey?: string,
     defaultVoiceId?: string | null,
-  ): Promise<{ configured: boolean; defaultVoiceId?: string }> {
+    endpoint?: VolcengineTtsEndpoint | null,
+  ): Promise<{
+    configured: boolean;
+    defaultVoiceId?: string;
+    endpoint?: VolcengineTtsEndpoint;
+  }> {
     const normalized = apiKey?.trim();
     if (
       apiKey !== undefined &&
@@ -73,10 +100,20 @@ export class VolcengineTtsSettingsStore {
       (!voice || voice.length > AUDIO_VOICE_ID_MAX_LENGTH || !new RegExp(AUDIO_VOICE_ID_PATTERN).test(voice))
     )
       throw new Error(`${DOUBAO_SPEECH_PROVIDER_NAME} Speaker ID is invalid`);
+    if (endpoint !== undefined && endpoint !== null && !(ENDPOINTS as readonly string[]).includes(endpoint))
+      throw new Error(`${DOUBAO_SPEECH_PROVIDER_NAME} endpoint is invalid`);
     await this.#mutate(async () => {
       const nextApiKey = normalized ?? this.#settings.apiKey;
       if (!nextApiKey)
         throw new Error(`Connect ${DOUBAO_SPEECH_PROVIDER_NAME} with an API key first`);
+      // "standard" is the default endpoint; only persist the non-default so
+      // saved settings and the GET response stay backward compatible.
+      const nextEndpoint =
+        endpoint === undefined
+          ? this.#settings.endpoint
+          : endpoint === "standard"
+            ? undefined
+            : endpoint;
       const next: StoredVolcengineTtsSettings = {
         version: 1,
         apiKey: nextApiKey,
@@ -87,6 +124,7 @@ export class VolcengineTtsSettingsStore {
           : voice
             ? { defaultVoiceId: voice }
             : {}),
+        ...(nextEndpoint ? { endpoint: nextEndpoint } : {}),
       };
       await mkdir(path.dirname(this.#filePath), { recursive: true });
       const temporary = `${this.#filePath}.${randomUUID()}.tmp`;

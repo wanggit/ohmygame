@@ -52,6 +52,23 @@ describe("custom image reference settings", () => {
     await act(async () => restore.click());
     expect(onChange).toHaveBeenCalledWith({ ...usages, image: { ...usages.image, maxReferenceImages: 16 } });
   });
+
+  it("offers pixel and resolution sizes for Seedream and drops incompatible formats on protocol switches", async () => {
+    const usages: CustomModelUsages = { image: { ...defaultImageSettings("openai-images", "my-image-alias"), protocol: "volcengine-images", sizeFormat: "resolution", resolutions: ["2K"] } };
+    const onChange = vi.fn();
+    await act(async () => root.render(<CustomModelUsageFields usages={usages} modelId="doubao-seedream-5-0-pro" onChange={onChange} />));
+    const sizeSelect = [...host.querySelectorAll("label")].find((label) => label.textContent?.startsWith("Size parameter"))!.querySelector("select")!;
+    expect([...sizeSelect.options].map((option) => option.value)).toEqual(["pixel", "resolution"]);
+    expect(sizeSelect.value).toBe("resolution");
+
+    // Aspect-ratio sizes belong to OpenAI Images; Seedream keeps only its own formats.
+    const protocolSelect = [...host.querySelectorAll("label")].find((label) => label.textContent?.startsWith("Image protocol"))!.querySelector("select")!;
+    await act(async () => {
+      protocolSelect.value = "openrouter-images";
+      protocolSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(onChange).toHaveBeenCalledWith({ image: expect.objectContaining({ protocol: "openrouter-images", sizeFormat: undefined }) });
+  });
 });
 
 describe("custom video protocol settings", () => {

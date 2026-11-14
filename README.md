@@ -174,7 +174,7 @@ OhMyGame does not lock you into one model or charge per run.
   canvas, media tools, and plugins. Enable them in Settings; native CLI
   permission limits apply. See [coding agents](docs/coding-agents.md).
 - **Media models** for images, video, and 3D through OpenAI, OpenRouter,
-  Volcengine Ark / BytePlus ModelArk, and Meshy.
+  Volcengine Ark / BytePlus ModelArk (including Agent Plan subscriptions), and Meshy.
 - **Custom providers and model aliases** with selectable language, image, video
   and 3D uses, protocol templates and generation defaults.
   See [custom model configuration](docs/custom-models.md).
@@ -219,8 +219,8 @@ Click **Next** to connect a model before your first prompt:
    | To make                       | Connect                                                             |
    | ----------------------------- | ------------------------------------------------------------------- |
    | Design docs, code, playtests  | Any language model provider                                         |
-   | Images and sprites            | Codex CLI (local sign-in), OpenAI (API key), OpenRouter, or Volcengine Ark / BytePlus ModelArk |
-   | Video                         | OpenRouter, or Volcengine Ark / BytePlus ModelArk                   |
+   | Images and sprites            | Codex CLI (local sign-in), OpenAI (API key), OpenRouter, or Volcengine Ark / BytePlus ModelArk (incl. Agent Plan) |
+   | Video                         | OpenRouter, or Volcengine Ark / BytePlus ModelArk (incl. Agent Plan)     |
    | 3D models, rigging, animation | Meshy, Tripo, or Hyper3D (capabilities vary by provider)              |
 
    The **Codex CLI** image provider uses your local Codex sign-in and account

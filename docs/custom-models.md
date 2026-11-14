@@ -125,6 +125,36 @@ The Gemini preset uses Google's API-key header. Gemini image models reached
 through an OpenAI-compatible relay use bearer authentication. Services with
 **No API key** receive generation requests without an authorization header.
 
+## Volcengine Ark Agent Plan (subscription)
+
+The Ark Agent Plan subscription is a metered-quota alternative to the pay-as-you-go
+Ark API. It ships a **dedicated Base URL and dedicated API key** from the Agent Plan
+console; plan keys are rejected by the standard `/api/v3` endpoints and vice versa.
+Language, image (Seedream), video (Seedance), and speech models are all included in
+the plan.
+
+To use it, add a custom provider and pick the **Volcengine Ark Agent Plan
+(subscription)** template, which prefills the Base URL
+`https://ark.cn-beijing.volces.com/api/plan/v3` and presets the media protocols to
+Seedream and Seedance. Then add the plan's model IDs manually (the plan endpoint has
+no `/models` discovery), for example:
+
+| Use | Model IDs | Settings |
+| --- | --- | --- |
+| Language | `doubao-seed-2.1-pro`, `doubao-seed-2.1-lite`, `glm-5.3`, `deepseek-v4.1-flash`, … | OpenAI Chat Completions |
+| Image | `doubao-seedream-5-0-pro`, `doubao-seedream-5.0-flash` | Seedream protocol; resolutions 1K/1.5K/2K |
+| Video | `doubao-seedance-2.5`, `doubao-seedance-2.0`, `doubao-seedance-2.0-fast`, `doubao-seedance-2.0-mini` | Seedance protocol; 480p/720p/1080p (+4K on 2.0), 4–30 s (2.5) or 4–15 s (2.0) |
+
+Copy model IDs from the plan's activation page exactly; some are spelled with dots
+(`doubao-seedream-5.0-flash`) and some with dashes (`doubao-seedream-5-0-pro`).
+Speech synthesis through the plan uses the built-in Doubao Speech provider with its
+**Service endpoint** set to Agent Plan — see [Audio providers](audio-providers.md).
+Seed Audio (music and sound effects) is not part of the plan.
+
+If the image endpoint rejects pixel sizes, switch the model's **Size parameter** to
+the resolution shorthand (`2K`), which matches the plan's API examples. Consumption
+draws down the plan's AFP quota rather than an account balance.
+
 ## Generation settings
 
 Image settings include resolutions, aspect ratios, reference-image limits and

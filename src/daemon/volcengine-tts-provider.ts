@@ -7,14 +7,27 @@ import {
   type AudioModel,
   type GeneratedAudio,
   type SpeechAudioRequest,
+  type VolcengineTtsEndpoint,
 } from "../shared/audio.js";
 import {
   AudioGenerationError,
   type AudioProviderAdapter,
 } from "./audio-generation.js";
 
-const DEFAULT_ENDPOINT =
-  "https://openspeech.bytedance.com/api/v3/tts/unidirectional";
+/**
+ * Agent Plan keeps the request shape and `X-Api-Key` auth of the standard
+ * service; only the path gains a `/plan/` segment (see the Ark Agent Plan
+ * voice-model docs). The plan key is rejected by the standard endpoint and
+ * vice versa, so the two never share a base URL.
+ */
+export const VOLCENGINE_TTS_ENDPOINTS: Readonly<
+  Record<VolcengineTtsEndpoint, string>
+> = {
+  standard: "https://openspeech.bytedance.com/api/v3/tts/unidirectional",
+  "agent-plan": "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional",
+};
+
+const DEFAULT_ENDPOINT = VOLCENGINE_TTS_ENDPOINTS.standard;
 const PROVIDER_ID = "volcengine-tts";
 const RESOURCE_ID = "seed-tts-2.0";
 
@@ -29,11 +42,17 @@ export class VolcengineTtsProvider implements AudioProviderAdapter {
   constructor(
     private readonly apiKey: () => string | undefined,
     private readonly request: typeof fetch = fetch,
-    private readonly baseUrl = DEFAULT_ENDPOINT,
+    /** Fixed endpoint, or a getter so endpoint switches apply without a restart. */
+    private readonly baseUrl: string | (() => string | undefined) = DEFAULT_ENDPOINT,
     private readonly isEnabled: () => boolean = () => true,
     private readonly configuredVoiceId: () => string | undefined = () =>
       undefined,
   ) {}
+
+  private endpoint(): string {
+    return (typeof this.baseUrl === "function" ? this.baseUrl() : this.baseUrl) ??
+      DEFAULT_ENDPOINT;
+  }
 
   configured(): boolean {
     return Boolean(this.apiKey());
@@ -75,7 +94,7 @@ export class VolcengineTtsProvider implements AudioProviderAdapter {
     if (input.style?.trim()) additions.context_texts = [input.style.trim()];
     let response: Response;
     try {
-      response = await this.request(this.baseUrl, {
+      response = await this.request(this.endpoint(), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -114,12 +114,13 @@ export interface CustomImageModelSettings {
   /**
    * How OpenAI Images requests spell the size parameter: fixed pixel sizes
    * ("1024x1024", the OpenAI default) or aspect ratios ("1:1") as used by
-   * gateways such as FreeAiProxy. Other protocols derive their own formats.
+   * gateways such as FreeAiProxy. Seedream accepts "resolution" ("2K") for
+   * subscription endpoints. Other protocols derive their own formats.
    */
   sizeFormat?: ImageSizeFormat;
 }
 
-export type ImageSizeFormat = "pixel" | "aspect-ratio";
+export type ImageSizeFormat = "pixel" | "aspect-ratio" | "resolution";
 
 export type VideoProtocol = "openrouter-videos" | "seedance" | "openai-videos";
 export interface CustomVideoModelSettings {
@@ -351,7 +352,7 @@ export interface ImageModel extends ImageModelRef {
   protocol: ImageProtocol | "codex-cli";
   supportsResolution?: boolean;
   supportsAspectRatio?: boolean;
-  /** OpenAI Images only: pixel sizes (default) or aspect-ratio strings for the size parameter. */
+  /** OpenAI Images: pixel sizes (default) or aspect-ratio strings for the size parameter. Seedream: pixel sizes (default) or resolution shorthands ("2K"). */
   sizeFormat?: ImageSizeFormat;
 }
 
@@ -1104,7 +1105,7 @@ export interface WorkspaceFileContent {
 export const IMAGE_SIZES = ["1024x1024", "1536x1024", "1024x1536"] as const;
 export type ImageSize = (typeof IMAGE_SIZES)[number];
 export const IMAGE_MAX_REFERENCE_IMAGES = 16;
-export const IMAGE_RESOLUTIONS = ["512", "1K", "2K", "4K"] as const;
+export const IMAGE_RESOLUTIONS = ["512", "1K", "1.5K", "2K", "4K"] as const;
 export type ImageResolution = (typeof IMAGE_RESOLUTIONS)[number];
 export const IMAGE_ASPECT_RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"] as const;
 export type ImageAspectRatio = (typeof IMAGE_ASPECT_RATIOS)[number];

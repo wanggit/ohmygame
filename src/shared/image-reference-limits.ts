@@ -4,6 +4,9 @@ export const SEEDREAM_REFERENCE_LIMITS = {
   "doubao-seedream-5-0-pro-260628": 10,
   "doubao-seedream-5-0-flash-260915": 10,
   "doubao-seedream-5-0-260128": 14,
+  /** Agent Plan model IDs (no date suffix) mirror their dated counterparts. */
+  "doubao-seedream-5-0-pro": 10,
+  "doubao-seedream-5.0-flash": 10,
 } as const;
 
 /** FreeAiProxy image models: one calibrated reference; wenxin has no upload entry. */

@@ -78,4 +78,39 @@ describe("Volcengine TTS settings", () => {
       ).update(undefined, "zh_male_m191_uranus_bigtts"),
     ).rejects.toThrow("API key");
   });
+
+  it("persists the Agent Plan endpoint and resets to the standard default", async () => {
+    const directory = await mkdtemp(
+      path.join(tmpdir(), "ohmygame-volcengine-tts-endpoint-"),
+    );
+    const settings = new VolcengineTtsSettingsStore(directory);
+    await settings.load();
+    await settings.update("secret-key");
+    expect(settings.get()).toEqual({ configured: true });
+    expect(settings.endpoint()).toBe("standard");
+
+    await settings.update(undefined, undefined, "agent-plan");
+    expect(settings.get()).toEqual({ configured: true, endpoint: "agent-plan" });
+    expect(settings.endpoint()).toBe("agent-plan");
+    expect(
+      JSON.parse(
+        await readFile(path.join(directory, "volcengine-tts.json"), "utf8"),
+      ),
+    ).toEqual({
+      version: 1,
+      apiKey: "secret-key",
+      endpoint: "agent-plan",
+    });
+
+    const restored = new VolcengineTtsSettingsStore(directory);
+    await restored.load();
+    expect(restored.endpoint()).toBe("agent-plan");
+
+    await restored.update(undefined, undefined, "standard");
+    expect(restored.get()).toEqual({ configured: true });
+    expect(restored.endpoint()).toBe("standard");
+    await expect(
+      settings.update(undefined, undefined, "other" as never),
+    ).rejects.toThrow("endpoint");
+  });
 });

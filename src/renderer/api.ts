@@ -412,7 +412,7 @@ export async function updateMinimaxApiKey(providerId: string, apiKey: string): P
   });
 }
 
-export async function getVolcengineTtsSettings(): Promise<{ configured: boolean; defaultVoiceId?: string }> {
+export async function getVolcengineTtsSettings(): Promise<{ configured: boolean; defaultVoiceId?: string; endpoint?: "standard" | "agent-plan" }> {
   return request("/settings/models/providers/volcengine-tts");
 }
 
@@ -423,6 +423,13 @@ export async function updateVolcengineTtsApiKey(apiKey: string): Promise<{ confi
   });
   notifyAgentModelsChanged();
   return result;
+}
+
+export async function saveVolcengineTtsEndpoint(endpoint: "standard" | "agent-plan"): Promise<{ configured: boolean; defaultVoiceId?: string; endpoint?: "standard" | "agent-plan" }> {
+  return request("/settings/models/providers/volcengine-tts", {
+    method: "PUT",
+    body: JSON.stringify({ endpoint }),
+  });
 }
 
 export async function updateVolcengineSeedAudioApiKey(apiKey: string): Promise<{ configured: boolean }> {

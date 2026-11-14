@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { VolcengineTtsProvider } from "../src/daemon/volcengine-tts-provider.js";
+import { VolcengineTtsProvider, VOLCENGINE_TTS_ENDPOINTS } from "../src/daemon/volcengine-tts-provider.js";
 
 const MODEL = { provider: "volcengine-tts", id: "seed-tts-2.0" } as const;
 
@@ -144,5 +144,44 @@ describe("Volcengine TTS provider", () => {
     expect(
       JSON.parse(String(request.mock.calls[0]?.[1]?.body)).req_params.speaker,
     ).toBe("zh_female_popo_mars_bigtts");
+  });
+
+  it("targets the Agent Plan endpoint when the getter selects it", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(
+          `${JSON.stringify({ code: 0, data: Buffer.from("audio").toString("base64") })}\n`,
+        ),
+      );
+    const provider = new VolcengineTtsProvider(
+      () => "plan-key",
+      request,
+      () => VOLCENGINE_TTS_ENDPOINTS["agent-plan"],
+    );
+    await provider.generate({
+      operation: "speech",
+      text: "hello",
+      model: MODEL,
+      voiceId: "voice",
+    });
+    const [url, init] = request.mock.calls[0]!;
+    expect(url).toBe(
+      "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional",
+    );
+    // The plan keeps the standard request shape and auth headers.
+    expect(init?.headers).toEqual(
+      expect.objectContaining({
+        "X-Api-Key": "plan-key",
+        "X-Api-Resource-Id": "seed-tts-2.0",
+      }),
+    );
+    expect(JSON.parse(String(init?.body))).toEqual({
+      req_params: {
+        text: "hello",
+        speaker: "voice",
+        audio_params: { format: "mp3", sample_rate: 24_000 },
+      },
+    });
   });
 });

@@ -29,6 +29,7 @@ import {
   updateCustomMusicSettings,
   getVolcengineTtsSettings,
   saveVolcengineTtsDefaultVoiceId,
+  saveVolcengineTtsEndpoint,
   previewVolcengineTtsSpeech,
   listVideoModelCatalog,
   listAudioModelCatalog,
@@ -526,6 +527,9 @@ function VolcengineTtsAuthView({ provider, onBack, onCompleted }: { provider: Pr
   const [apiKey, setApiKey] = useState("");
   const [keyError, setKeyError] = useState<string>();
   const [savingKey, setSavingKey] = useState(false);
+  const [endpoint, setEndpoint] = useState<"standard" | "agent-plan">("standard");
+  const [endpointError, setEndpointError] = useState<string>();
+  const [savingEndpoint, setSavingEndpoint] = useState(false);
   const [defaultVoiceId, setDefaultVoiceId] = useState("");
   const [voiceError, setVoiceError] = useState<string>();
   const [savingVoice, setSavingVoice] = useState(false);
@@ -538,7 +542,9 @@ function VolcengineTtsAuthView({ provider, onBack, onCompleted }: { provider: Pr
   useEffect(() => {
     let active = true;
     void getVolcengineTtsSettings().then((settings) => {
-      if (active) setDefaultVoiceId(settings.defaultVoiceId ?? "");
+      if (!active) return;
+      setDefaultVoiceId(settings.defaultVoiceId ?? "");
+      setEndpoint(settings.endpoint ?? "standard");
     }).catch(() => undefined);
     return () => { active = false; };
   }, []);
@@ -565,6 +571,16 @@ function VolcengineTtsAuthView({ provider, onBack, onCompleted }: { provider: Pr
       setModelsRevision((value) => value + 1);
     } catch (cause) { setVoiceError(errorMessage(cause)); }
     finally { setSavingVoice(false); }
+  }
+  async function saveEndpoint(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    setSavingEndpoint(true);
+    setEndpointError(undefined);
+    try {
+      const settings = await saveVolcengineTtsEndpoint(endpoint);
+      setEndpoint(settings.endpoint ?? "standard");
+    } catch (cause) { setEndpointError(errorMessage(cause)); }
+    finally { setSavingEndpoint(false); }
   }
   async function runPreview(): Promise<void> {
     if (previewBusy) return;
@@ -610,6 +626,28 @@ function VolcengineTtsAuthView({ provider, onBack, onCompleted }: { provider: Pr
         </div>
       </form>
       {keyError ? <p className="settings-error" role="alert">{keyError}</p> : null}
+      {provider.configured ? (
+        <form className="settings-detail-field" onSubmit={(event) => void saveEndpoint(event)}>
+          <label className="settings-search-field-label" htmlFor="volcengine-tts-endpoint-select">{t("providers.serviceEndpoint")}</label>
+          <select
+            id="volcengine-tts-endpoint-select"
+            className="settings-search-input"
+            value={endpoint}
+            onChange={(event) => setEndpoint(event.target.value as "standard" | "agent-plan")}
+            disabled={savingEndpoint || deletion.busy}
+          >
+            <option value="standard">{t("providers.endpointStandard")}</option>
+            <option value="agent-plan">{t("providers.endpointAgentPlan")}</option>
+          </select>
+          <div className="settings-detail-inline">
+            <button className="settings-primary-button" type="submit" disabled={savingEndpoint || deletion.busy}>
+              {savingEndpoint ? t("common.saving") : t("common.save")}
+            </button>
+          </div>
+          <p className="settings-detail-hint">{t("providers.endpointHint")}</p>
+          {endpointError ? <p className="settings-error" role="alert">{endpointError}</p> : null}
+        </form>
+      ) : null}
       {provider.configured ? (
         <form className="settings-detail-field" onSubmit={(event) => void saveVoice(event)}>
           <label className="settings-search-field-label" htmlFor="volcengine-tts-voice-select">{t("providers.defaultVoiceId")}</label>

@@ -1687,6 +1687,19 @@ describe("daemon", () => {
     expect((await app.inject({ method: "GET", url: "/settings/models/providers/volcengine-tts" })).json())
       .toEqual({ configured: true, defaultVoiceId: "zh_female_vv_uranus_bigtts" });
 
+    expect((await app.inject({
+      method: "PUT",
+      url: "/settings/models/providers/volcengine-tts",
+      payload: { endpoint: "agent-plan" },
+    })).json()).toEqual({ configured: true, defaultVoiceId: "zh_female_vv_uranus_bigtts", endpoint: "agent-plan" });
+    expect((await app.inject({ method: "GET", url: "/settings/models/providers/volcengine-tts" })).json())
+      .toEqual({ configured: true, defaultVoiceId: "zh_female_vv_uranus_bigtts", endpoint: "agent-plan" });
+    expect((await app.inject({
+      method: "PUT",
+      url: "/settings/models/providers/volcengine-tts",
+      payload: { endpoint: "unknown" },
+    })).statusCode).toBe(400);
+
     const providers = (await app.inject({ method: "GET", url: "/settings/providers" })).json();
     expect(providers).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "volcengine-tts", configured: true, capabilities: ["audio"] }),
@@ -1706,7 +1719,7 @@ describe("daemon", () => {
       method: "PUT",
       url: "/settings/models/providers/volcengine-tts",
       payload: { defaultVoiceId: null },
-    })).json()).toEqual({ configured: true });
+    })).json()).toEqual({ configured: true, endpoint: "agent-plan" });
     expect((await app.inject({ method: "DELETE", url: "/settings/models/providers/volcengine-tts" })).statusCode).toBe(204);
     expect((await app.inject({ method: "GET", url: "/settings/models/providers/volcengine-tts" })).json())
       .toEqual({ configured: false });

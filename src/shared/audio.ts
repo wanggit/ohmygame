@@ -15,6 +15,8 @@ export const AUDIO_VOICE_ID_MAX_LENGTH = 256;
 export const AUDIO_VOICE_ID_PATTERN = "^[A-Za-z0-9_-]+$";
 export const DOUBAO_SPEECH_PROVIDER_NAME = "Doubao Speech";
 export const DOUBAO_SEED_AUDIO_PROVIDER_NAME = "Doubao Seed Audio";
+/** Doubao Speech HTTP endpoints: the metered standard service vs the Ark Agent Plan subscription gateway. */
+export type VolcengineTtsEndpoint = "standard" | "agent-plan";
 export const CUSTOM_MUSIC_PROVIDER_NAME = "Custom Music API";
 export const CUSTOM_MUSIC_DEFAULT_MODEL = "wenxin-music";
 export const CUSTOM_MUSIC_BASE_URL = "http://127.0.0.1:8000/v1";

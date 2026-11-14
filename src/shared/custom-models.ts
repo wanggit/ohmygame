@@ -95,7 +95,7 @@ export function normalizeModelUsages(value: unknown): CustomModelUsages | undefi
       aspectRatios: choices(config.aspectRatios, IMAGE_ASPECT_RATIOS, "image aspect ratios"),
       maxReferenceImages: integer(config.maxReferenceImages, 0, IMAGE_MAX_REFERENCE_IMAGES, "reference image limit"),
       maxOutputs: choices([config.maxOutputs], IMAGE_OUTPUT_COUNTS, "image output count")[0]!,
-      ...(config.sizeFormat !== undefined ? { sizeFormat: choices([config.sizeFormat], ["pixel", "aspect-ratio"] as const, "image size format")[0]! } : {}) };
+      ...(config.sizeFormat !== undefined ? { sizeFormat: choices([config.sizeFormat], ["pixel", "aspect-ratio", "resolution"] as const, "image size format")[0]! } : {}) };
   }
   if (value.video !== undefined) {
     const config = value.video;

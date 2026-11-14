@@ -25,6 +25,11 @@ const emptyModel = (provider: Pick<SaveCustomProviderRequest, "api" | "preset">)
   reasoning: false, supportsImages: false, usages: isLocalModelProvider(provider) ? { language: true } : {},
 });
 
+type CustomProviderTemplate = "generic" | "volcengine-agent-plan";
+
+/** Ark Agent Plan subscription gateway: same protocols as the metered Ark API behind a dedicated Base URL and key. */
+const AGENT_PLAN_BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3";
+
 export type CustomProviderField = "name" | "baseUrl" | "api" | "apiKey" | "models";
 
 type CustomProviderFormProps = {
@@ -54,6 +59,7 @@ export function CustomProviderForm({ settings, initialProvider, initialFocus = "
   const savingRef = useRef(false);
   const discovery = useRef<AbortController | undefined>(undefined);
   const [form, setForm] = useState<SaveCustomProviderRequest>(settings ? { name: settings.name, baseUrl: settings.baseUrl, api: settings.api, authentication: settings.authentication, preset: settings.preset } : initialProvider ?? { name: "", baseUrl: "", api: "openai-completions", authentication: "api_key" });
+  const [template, setTemplate] = useState<CustomProviderTemplate>("generic");
   const [rows, setRows] = useState<ModelRow[]>(() => {
     const hidden = new Set(settings?.hiddenModelIds);
     return settings?.models.map((model) => ({ model, enabled: !hidden.has(model.id) })) ?? [];
@@ -112,6 +118,18 @@ export function CustomProviderForm({ settings, initialProvider, initialFocus = "
       setManual((current) => invalidateCustomModelCapabilities(current, key === "api" ? String(value) : current.api));
     }
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function applyTemplate(value: CustomProviderTemplate): void {
+    setTemplate(value);
+    cancelDiscovery();
+    setDiscoveryError(undefined);
+    setDiscoveryWarnings([]);
+    setFetchedCount(undefined);
+    setTruncated(false);
+    setForm((current) => value === "volcengine-agent-plan"
+      ? { ...current, preset: "seedance", baseUrl: current.baseUrl.trim() ? current.baseUrl : AGENT_PLAN_BASE_URL }
+      : { ...current, preset: undefined, baseUrl: current.baseUrl === AGENT_PLAN_BASE_URL ? "" : current.baseUrl });
   }
 
   async function fetchModels(): Promise<void> {
@@ -204,6 +222,10 @@ export function CustomProviderForm({ settings, initialProvider, initialFocus = "
       <form noValidate onSubmit={(event) => void submit(event)}>
         <div className="custom-provider-dialog-body">
           <fieldset className="project-settings-section" disabled={saving}>
+            {!settings && !initialProvider ? <label><span>{t("customProvider.template")}</span><select value={template} onChange={(event) => applyTemplate(event.target.value as CustomProviderTemplate)}>
+              <option value="generic">{t("customProvider.templateGeneric")}</option>
+              <option value="volcengine-agent-plan">{t("customProvider.templateAgentPlan")}</option>
+            </select><small>{template === "volcengine-agent-plan" ? t("customProvider.templateAgentPlanHint") : t("customProvider.templateGenericHint")}</small></label> : null}
             <label><span>{t("models.displayName")}</span><input ref={nameInput} value={form.name} onChange={(event) => field("name", event.target.value)} placeholder={t("customProvider.namePlaceholder")} maxLength={100} required autoComplete="off" /></label>
             <label><span>{t("providers.baseUrl")}</span><input ref={endpointInput} type="url" value={form.baseUrl} onChange={(event) => field("baseUrl", event.target.value)} placeholder="https://api.example.com/v1" required autoComplete="off" spellCheck={false} /><small>{t("customProvider.baseUrlHint")}</small></label>
             <div className="project-settings-field-row">

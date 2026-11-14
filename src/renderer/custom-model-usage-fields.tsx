@@ -35,16 +35,19 @@ export function CustomModelUsageFields({ usages, preset, modelId, onChange }: {
       <label><span>{t("modelUsage.imageProtocol")}</span><select value={image.protocol} onChange={(event) => {
         const protocol = event.target.value as ImageProtocol;
         const resolutions = image.resolutions.filter((value) => value !== "512" || protocol === "gemini-generate-content" || protocol === "openrouter-images");
+        const sizeFormats: readonly NonNullable<typeof image.sizeFormat>[] = protocol === "openai-images" ? ["pixel", "aspect-ratio"] : protocol === "volcengine-images" ? ["pixel", "resolution"] : [];
         onChange({ ...usages, image: { ...image, protocol, resolutions: resolutions.length ? resolutions : ["1K"],
-          ...(protocol === "openai-images" ? {} : { sizeFormat: undefined }) } });
+          sizeFormat: image.sizeFormat && sizeFormats.includes(image.sizeFormat) ? image.sizeFormat : undefined } });
       }}>
         {Object.entries(IMAGE_PROTOCOL_LABELS).map(([protocol, label]) => <option key={protocol} value={protocol}>{label}</option>)}
       </select></label>
       <details className="custom-provider-advanced"><summary>{t("modelUsage.imageSettings")}</summary>
         <EndpointField value={image.baseUrl} onChange={(baseUrl) => onChange({ ...usages, image: { ...image, baseUrl } })} />
-        {image.protocol === "openai-images" ? <label><span>{t("modelUsage.sizeFormat")}</span><select value={image.sizeFormat ?? knownImageSizeFormat(modelId) ?? "pixel"} onChange={(event) => onChange({ ...usages, image: { ...image, sizeFormat: event.target.value as NonNullable<typeof image.sizeFormat> } })}>
+        {image.protocol === "openai-images" || image.protocol === "volcengine-images" ? <label><span>{t("modelUsage.sizeFormat")}</span><select value={image.sizeFormat ?? knownImageSizeFormat(modelId) ?? "pixel"} onChange={(event) => onChange({ ...usages, image: { ...image, sizeFormat: event.target.value as NonNullable<typeof image.sizeFormat> } })}>
           <option value="pixel">{t("modelUsage.sizeFormatPixel")}</option>
-          <option value="aspect-ratio">{t("modelUsage.sizeFormatAspectRatio")}</option>
+          {image.protocol === "openai-images"
+            ? <option value="aspect-ratio">{t("modelUsage.sizeFormatAspectRatio")}</option>
+            : <option value="resolution">{t("modelUsage.sizeFormatResolution")}</option>}
         </select></label> : null}
         <ChoiceFields label={t("modelUsage.imageResolutions")} options={IMAGE_RESOLUTIONS.filter((value) => value !== "512" || image.protocol === "gemini-generate-content" || image.protocol === "openrouter-images")} value={image.resolutions} onChange={(resolutions) => onChange({ ...usages, image: { ...image, resolutions } })} />
         <ChoiceFields label={t("modelUsage.imageAspectRatios")} options={IMAGE_ASPECT_RATIOS} value={image.aspectRatios} onChange={(aspectRatios) => onChange({ ...usages, image: { ...image, aspectRatios } })} />

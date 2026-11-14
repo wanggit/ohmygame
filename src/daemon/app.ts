@@ -94,13 +94,13 @@ import { ToolRunner, ToolRunError } from "./tools.js";
 import type { VideoGenerator } from "./video-generation.js";
 import { ProviderVideos } from "./provider-videos.js";
 import { AudioGenerationError, ProviderAudio, type AudioGenerator } from "./audio-generation.js";
-import { VolcengineTtsProvider } from "./volcengine-tts-provider.js";
+import { VolcengineTtsProvider, VOLCENGINE_TTS_ENDPOINTS } from "./volcengine-tts-provider.js";
 import { VolcengineTtsSettingsStore } from "./volcengine-tts-settings.js";
 import { VolcengineSeedAudioProvider } from "./volcengine-seed-audio-provider.js";
 import { VolcengineSeedAudioSettingsStore } from "./volcengine-seed-audio-settings.js";
 import { CustomMusicProvider } from "./custom-music-provider.js";
 import { CustomMusicSettingsStore } from "./custom-music-settings.js";
-import { AUDIO_OUTPUT_FORMATS, AUDIO_SAMPLE_RATES, AUDIO_VOICE_ID_MAX_LENGTH, AUDIO_VOICE_ID_PATTERN, CUSTOM_MUSIC_PROVIDER_NAME, DOUBAO_SEED_AUDIO_PROVIDER_NAME, DOUBAO_SPEECH_PROVIDER_NAME, availableAudioOperations, type AudioOperation } from "../shared/audio.js";
+import { AUDIO_OUTPUT_FORMATS, AUDIO_SAMPLE_RATES, AUDIO_VOICE_ID_MAX_LENGTH, AUDIO_VOICE_ID_PATTERN, CUSTOM_MUSIC_PROVIDER_NAME, DOUBAO_SEED_AUDIO_PROVIDER_NAME, DOUBAO_SPEECH_PROVIDER_NAME, availableAudioOperations, type AudioOperation, type VolcengineTtsEndpoint } from "../shared/audio.js";
 import { isSeedanceProviderId, SEEDANCE_PROVIDER_IDS, SEEDANCE_PROVIDERS } from "./seedance-models.js";
 import { SeedanceSettingsStore } from "./seedance-settings.js";
 import { isMinimaxProviderId, MINIMAX_PROVIDER_IDS, MINIMAX_PROVIDERS } from "./minimax-models.js";
@@ -744,7 +744,7 @@ export function createApp(options: AppOptions = {}) {
   const volcengineTtsProvider = new VolcengineTtsProvider(
     () => volcengineTtsSettings.key(),
     options.audioFetch,
-    undefined,
+    () => VOLCENGINE_TTS_ENDPOINTS[volcengineTtsSettings.endpoint()],
     () => providerEnabled("volcengine-tts"),
     () => volcengineTtsSettings.defaultVoiceId(),
   );
@@ -2554,11 +2554,12 @@ export function createApp(options: AppOptions = {}) {
   });
 
   app.get("/settings/models/providers/volcengine-tts", async () => volcengineTtsSettings.get());
-  app.put<{ Body: { apiKey?: string; defaultVoiceId?: string | null } }>("/settings/models/providers/volcengine-tts", { schema: { body: {
+  app.put<{ Body: { apiKey?: string; defaultVoiceId?: string | null; endpoint?: VolcengineTtsEndpoint | null } }>("/settings/models/providers/volcengine-tts", { schema: { body: {
     type: "object", additionalProperties: false, minProperties: 1,
-    properties: { apiKey: { type: "string", minLength: 1, maxLength: 10_000 }, defaultVoiceId: { anyOf: [{ type: "string", minLength: 1, maxLength: AUDIO_VOICE_ID_MAX_LENGTH, pattern: AUDIO_VOICE_ID_PATTERN }, { type: "null" }] } },
+    properties: { apiKey: { type: "string", minLength: 1, maxLength: 10_000 }, defaultVoiceId: { anyOf: [{ type: "string", minLength: 1, maxLength: AUDIO_VOICE_ID_MAX_LENGTH, pattern: AUDIO_VOICE_ID_PATTERN }, { type: "null" }] },
+      endpoint: { anyOf: [{ type: "string", enum: ["standard", "agent-plan"] }, { type: "null" }] } },
   } } }, async (request, reply) => {
-    try { return await volcengineTtsSettings.update(request.body.apiKey, request.body.defaultVoiceId); }
+    try { return await volcengineTtsSettings.update(request.body.apiKey, request.body.defaultVoiceId, request.body.endpoint); }
     catch (cause) { return reply.code(400).send({ error: cause instanceof Error ? cause.message : String(cause) }); }
   });
   app.post<{ Body: { text: string; voiceId?: string; language?: string; style?: string; speed?: number } }>(

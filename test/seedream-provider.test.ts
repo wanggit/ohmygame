@@ -56,6 +56,28 @@ describe("Seedream provider", () => {
     });
   });
 
+  it("sends resolution shorthands as size for models that configure it", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({
+      data: [{ b64_json: Buffer.from("image").toString("base64"), output_format: "png" }],
+    }));
+    // Agent Plan model IDs are not in the dated request table; a custom model
+    // definition with `sizeFormat: "resolution"` sends "2K" like the plan docs.
+    const model = {
+      provider: "custom-plan", providerName: "Agent Plan", id: "doubao-seedream-5-0-pro", name: "Doubao Seedream 5.0 Pro",
+      sizes: [], generationOptions: [{ resolution: "2K" as const, aspectRatio: "16:9" as const }],
+      supportsReferenceImage: true, maxReferenceImages: 10, maxOutputs: 1 as const,
+      protocol: "volcengine-images" as const, sizeFormat: "resolution" as const,
+    };
+    const provider = new SeedreamProvider(() => "plan-key", request);
+
+    await provider.generate(model, { prompt: "Key art", imageModel: model, resolution: "2K", aspectRatio: "16:9" });
+
+    expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toMatchObject({
+      model: "doubao-seedream-5-0-pro",
+      size: "2K",
+    });
+  });
+
   it("validates credentials, reference count, and official errors", async () => {
     const model = seedreamModel("doubao-seedream-5-0-flash-260915")!;
     await expect(new SeedreamProvider(() => undefined).generate(model, {
