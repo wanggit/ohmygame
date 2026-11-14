@@ -33,7 +33,19 @@ describe("OpenAI image generator", () => {
       quality: "medium",
       output_format: "webp",
       n: 1,
+      watermark: false,
     });
+  });
+
+  it("omits the watermark flag on the official OpenAI endpoint", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json({
+      data: [{ b64_json: Buffer.from("generated image").toString("base64") }],
+    }));
+    const generator = new OpenAIImageGenerator("secret-key", "https://api.openai.com/v1", request);
+
+    await generator.generate({ prompt: "A game icon", size: "1024x1024" });
+
+    expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).not.toHaveProperty("watermark");
   });
 
   it("maps authentication and moderation errors without exposing provider details", async () => {
@@ -74,6 +86,7 @@ describe("OpenAI image generator", () => {
     const form = init?.body as FormData;
     expect(form.get("prompt")).toBe("Turn this into concept art");
     expect(form.get("size")).toBe("1536x1024");
+    expect(form.get("watermark")).toBe("false");
     expect(form.get("image[]")).toBeInstanceOf(Blob);
   });
 
@@ -88,6 +101,7 @@ describe("OpenAI image generator", () => {
 
     const form = request.mock.calls[0]?.[1]?.body as FormData;
     expect(form.getAll("image[]")).toHaveLength(2);
+    expect(form.get("watermark")).toBeNull();
   });
 
   it.each([
@@ -121,6 +135,7 @@ describe("OpenAI image generator", () => {
       quality: "medium",
       output_format: "webp",
       n: 1,
+      watermark: false,
     });
 
     await generator.generate({ prompt: "A game icon", size: "1536x1024", sizeFormat: "aspect-ratio" });

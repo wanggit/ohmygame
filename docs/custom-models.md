@@ -131,7 +131,10 @@ Image settings include resolutions, aspect ratios, reference-image limits and
 output count. For the OpenAI Images protocol, **Size parameter** picks the size
 dialect sent to the endpoint: pixel sizes like `1024x1024` (default) or aspect
 ratios like `1:1` for gateways that accept ratio strings only — for example
-FreeAiProxy's image models, which reject pixel sizes. In aspect-ratio mode the
+FreeAiProxy's image models, which reject pixel sizes. Known FreeAiProxy model IDs
+(`yuanbao-image`, `doubao-image`, `chatglm-image`, `wenxin-image`) start with
+aspect-ratio sizes and their gateway-supported ratio lists, and saved settings
+without a size dialect follow the same calibration. In aspect-ratio mode the
 configured ratio is sent as `size` and a blank request falls back to the
 provider's default. Reference images for the OpenAI Images protocol go through
 multipart `/images/edits`. FreeAiProxy's `yuanbao-image`, `doubao-image` and

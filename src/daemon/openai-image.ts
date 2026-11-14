@@ -38,6 +38,12 @@ export class OpenAIImageGenerator implements ImageGenerator {
     private readonly authentication: "api_key" | "none" = "api_key",
   ) {}
 
+  /** Third-party OpenAI-compatible endpoints (relays serving Volcengine-family models) honor the
+   * `watermark: false` flag; the official OpenAI API rejects unknown parameters, so it is omitted there. */
+  private get suppressWatermark(): boolean {
+    return isThirdPartyEndpoint(this.baseUrl);
+  }
+
   async generate(input: ImageGenerationInput & { model?: string; sizeFormat?: ImageSizeFormat }, signal?: AbortSignal): Promise<GeneratedImage> {
     if (!this.apiKey) throw new ImageGenerationError("Image generation is not configured", 503);
     const images = input.images ?? [];
@@ -48,7 +54,7 @@ export class OpenAIImageGenerator implements ImageGenerator {
     let response: Response;
     try {
       const body = images.length
-        ? editForm({ ...input, images }, size)
+        ? editForm({ ...input, images }, size, this.suppressWatermark)
         : JSON.stringify({
             model: input.model ?? "gpt-image-2.5-flare",
             prompt: input.prompt,
@@ -56,6 +62,7 @@ export class OpenAIImageGenerator implements ImageGenerator {
             quality: "medium",
             output_format: "webp",
             n: 1,
+            ...(this.suppressWatermark ? { watermark: false } : {}),
           });
       response = await this.request(endpoint, {
         method: "POST",
@@ -183,7 +190,15 @@ function aspectRatioSize(input: ImageGenerationInput): string | undefined {
   return undefined;
 }
 
-function editForm(input: ImageGenerationInput & { model?: string }, size: string | undefined): FormData {
+function isThirdPartyEndpoint(baseUrl: string): boolean {
+  try {
+    return new URL(baseUrl).hostname !== "api.openai.com";
+  } catch {
+    return false;
+  }
+}
+
+function editForm(input: ImageGenerationInput & { model?: string }, size: string | undefined, suppressWatermark = false): FormData {
   const images = input.images;
   if (!images?.length) throw new ImageGenerationError("A reference image is required", 400);
   const form = new FormData();
@@ -193,6 +208,7 @@ function editForm(input: ImageGenerationInput & { model?: string }, size: string
   form.set("quality", "medium");
   form.set("output_format", "webp");
   form.set("n", "1");
+  if (suppressWatermark) form.set("watermark", "false");
   images.forEach((image, index) => {
     const extension = image.mediaType === "image/png" ? "png" : image.mediaType === "image/jpeg" ? "jpg" : "webp";
     form.append("image[]", new Blob([Buffer.from(image.data, "base64")], { type: image.mediaType }), `reference-${index + 1}.${extension}`);

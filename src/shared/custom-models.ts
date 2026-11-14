@@ -6,7 +6,7 @@ import {
   type Model3DDefinition, type Model3DModel, type ProviderCapability, type VideoAspectRatio, type VideoModel, type VideoProtocol,
 } from "./contracts.js";
 import { hyper3DCredits } from "./cloud-models.js";
-import { knownImageReferenceLimit } from "./image-reference-limits.js";
+import { knownImageAspectRatios, knownImageReferenceLimit, knownImageSizeFormat } from "./image-reference-limits.js";
 
 export const IMAGE_PROTOCOL_LABELS: Record<ImageProtocol, string> = {
   "openai-images": "OpenAI Images", "gemini-generate-content": "Gemini Generate Content",
@@ -24,7 +24,11 @@ export function modelUsageList(model: CustomProviderModel): ProviderCapability[]
   return (["language", "image", "video", "3d"] as const).filter((usage) => Boolean(usages[usage]));
 }
 export function defaultImageSettings(protocol: ImageProtocol = "openai-images", modelId = ""): CustomImageModelSettings {
-  return { protocol, resolutions: ["1K"], aspectRatios: ["1:1", "3:2", "2:3"], maxReferenceImages: knownImageReferenceLimit(modelId) ?? 1, maxOutputs: 1 };
+  // Known FreeAiProxy image models reject pixel sizes and narrow ratio lists; mirror
+  // their limits so a fresh model starts request-compatible with the gateway.
+  const sizeFormat = protocol === "openai-images" ? knownImageSizeFormat(modelId) : undefined;
+  return { protocol, resolutions: ["1K"], aspectRatios: [...(knownImageAspectRatios(modelId) ?? ["1:1", "3:2", "2:3"])], maxReferenceImages: knownImageReferenceLimit(modelId) ?? 1, maxOutputs: 1,
+    ...(sizeFormat ? { sizeFormat } : {}) };
 }
 export function defaultVideoSettings(protocol: VideoProtocol = "openrouter-videos"): CustomVideoModelSettings {
   return { protocol, resolutions: ["720p"], aspectRatios: ["16:9", "9:16", "1:1"], durations: [6],
@@ -44,13 +48,16 @@ export function defaultModel3DSettings(modelType: CustomModel3DSettings["modelTy
 
 export function customImageModel(provider: CustomProviderSettings, model: CustomProviderModel): ImageModel | undefined {
   const config = model.usages?.image;
+  // Saved settings win; models created before size-format calibration keep working by
+  // inferring the dialect from the known model ID (FreeAiProxy rejects pixel sizes).
+  const sizeFormat = config?.sizeFormat ?? (config?.protocol === "openai-images" ? knownImageSizeFormat(model.id) : undefined);
   // Aspect-ratio endpoints take ratios, not pixel sizes; leave sizes empty so legacy
   // pixel requests map through the model's resolution and aspect-ratio options.
   return config ? { provider: provider.id, providerName: provider.name, id: model.id, name: model.name,
-    protocol: config.protocol, sizes: config.sizeFormat === "aspect-ratio" ? [] : ["1024x1024", "1536x1024", "1024x1536"],
+    protocol: config.protocol, sizes: sizeFormat === "aspect-ratio" ? [] : ["1024x1024", "1536x1024", "1024x1536"],
     generationOptions: config.resolutions.flatMap((resolution) => config.aspectRatios.map((aspectRatio) => ({ resolution, aspectRatio }))),
     supportsReferenceImage: config.maxReferenceImages > 0, maxReferenceImages: config.maxReferenceImages, maxOutputs: config.maxOutputs,
-    ...(config.sizeFormat ? { sizeFormat: config.sizeFormat } : {}) } : undefined;
+    ...(sizeFormat ? { sizeFormat } : {}) } : undefined;
 }
 export function customVideoModel(provider: CustomProviderSettings, model: CustomProviderModel): VideoModel | undefined {
   const config = model.usages?.video;

@@ -5,7 +5,7 @@ import {
   type CustomModel3DSettings, type CustomModelUsages, type CustomProviderPreset, type ImageProtocol, type VideoProtocol,
 } from "../shared/contracts.js";
 import { defaultImageSettings, defaultModel3DSettings, defaultVideoSettings, IMAGE_PROTOCOL_LABELS, OPENAI_VIDEO_ASPECT_RATIOS, VIDEO_PROTOCOL_LABELS } from "../shared/custom-models.js";
-import { knownImageReferenceLimit } from "../shared/image-reference-limits.js";
+import { knownImageReferenceLimit, knownImageSizeFormat } from "../shared/image-reference-limits.js";
 import { t } from "./i18n.js";
 
 export function CustomModelUsageFields({ usages, preset, modelId, onChange }: {
@@ -42,7 +42,7 @@ export function CustomModelUsageFields({ usages, preset, modelId, onChange }: {
       </select></label>
       <details className="custom-provider-advanced"><summary>{t("modelUsage.imageSettings")}</summary>
         <EndpointField value={image.baseUrl} onChange={(baseUrl) => onChange({ ...usages, image: { ...image, baseUrl } })} />
-        {image.protocol === "openai-images" ? <label><span>{t("modelUsage.sizeFormat")}</span><select value={image.sizeFormat ?? "pixel"} onChange={(event) => onChange({ ...usages, image: { ...image, sizeFormat: event.target.value as NonNullable<typeof image.sizeFormat> } })}>
+        {image.protocol === "openai-images" ? <label><span>{t("modelUsage.sizeFormat")}</span><select value={image.sizeFormat ?? knownImageSizeFormat(modelId) ?? "pixel"} onChange={(event) => onChange({ ...usages, image: { ...image, sizeFormat: event.target.value as NonNullable<typeof image.sizeFormat> } })}>
           <option value="pixel">{t("modelUsage.sizeFormatPixel")}</option>
           <option value="aspect-ratio">{t("modelUsage.sizeFormatAspectRatio")}</option>
         </select></label> : null}

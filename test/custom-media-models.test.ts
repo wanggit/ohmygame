@@ -153,6 +153,27 @@ describe("unified custom media models", () => {
     expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body)).size).toBe("1536x1024");
   });
 
+  it("sends ratio sizes to known FreeAiProxy models without a saved size format and honors explicit overrides", async () => {
+    const request = vi.fn<typeof fetch>(async () => Response.json({ data: [{ b64_json: Buffer.from("image").toString("base64") }] }));
+    const { app, save } = await fixture(request);
+    // Saved before size-format calibration: the model has no sizeFormat field at all.
+    const legacy = { protocol: "openai-images" as const, resolutions: ["1K" as const], aspectRatios: ["1:1" as const], maxReferenceImages: 1, maxOutputs: 1 as const, baseUrl: "https://images.test/v1" };
+    const inferred = await save([model("yuanbao-image", { image: legacy })]);
+    await generate(app, "generate-image", { prompt: "A game icon", resolution: "1K", aspectRatio: "1:1", imageModel: { provider: inferred.id, id: "yuanbao-image" } });
+    expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body)).size).toBe("1:1");
+    const explicit = await save([model("yuanbao-image", { image: { ...legacy, sizeFormat: "pixel" } })], { name: "My studio two" });
+    await generate(app, "generate-image", { prompt: "A game icon", resolution: "1K", aspectRatio: "1:1", imageModel: { provider: explicit.id, id: "yuanbao-image" } });
+    expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body)).size).toBe("1024x1024");
+  });
+
+  it("calibrates default image settings for known FreeAiProxy models", () => {
+    expect(defaultImageSettings("openai-images", "yuanbao-image")).toMatchObject({ sizeFormat: "aspect-ratio", aspectRatios: ["1:1", "3:4", "4:3", "16:9", "9:16"], maxReferenceImages: 1 });
+    expect(defaultImageSettings("openai-images", "doubao-image")).toMatchObject({ sizeFormat: "aspect-ratio", aspectRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "16:9", "9:16"] });
+    expect(defaultImageSettings("openai-images", "wenxin-image")).toMatchObject({ sizeFormat: "aspect-ratio", aspectRatios: ["1:1", "3:2", "2:3"], maxReferenceImages: 0 });
+    expect(defaultImageSettings("openai-images", "gpt-image-1")).not.toHaveProperty("sizeFormat");
+    expect(defaultImageSettings("gemini-generate-content", "yuanbao-image")).not.toHaveProperty("sizeFormat");
+  });
+
   it.each(["openrouter-videos", "seedance"] as const)("creates, polls and downloads a custom video alias with %s", async (protocol) => {
     const request = vi.fn<typeof fetch>(async (url, init) => {
       if (String(url) === "https://files.test/output.mp4") return new Response(Buffer.from("video"));
