@@ -67,6 +67,7 @@ describe("bundled plugins", () => {
         { name: "Phaser Ui" },
         { name: "Phaser V3 To V4 Migration" },
         { name: "Phaser V4 New Features" },
+        { name: "Pixelfx" },
         { name: "React Three Fiber Game" },
         { name: "Sprite Pipeline" },
         { name: "Three Webgl Game" },

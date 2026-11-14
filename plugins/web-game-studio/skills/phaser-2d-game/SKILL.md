@@ -72,6 +72,7 @@ Deep Phaser 4 subsystem skills live next to this skill. Consult the matching one
 | Particle emitters | `../phaser-particles/SKILL.md` |
 | Filters, masks, lights, post-FX | `../phaser-fx/SKILL.md` |
 | Tilemaps and Tiled levels | `../phaser-tilemap/SKILL.md` |
+| **Pixel art effects (pixelfx)** | **`../pixelfx/SKILL.md`** |
 | HUD, health bars, buttons, dialogs | `../phaser-ui/SKILL.md` |
 | Music and sound effects | `../phaser-audio-and-sound/SKILL.md` |
 | RenderTexture and DynamicTexture | `../phaser-render-textures/SKILL.md` |

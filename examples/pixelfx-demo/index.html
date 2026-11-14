@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>pixelfx Demo</title>
+  <style>
+    body { margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; background: #1a1a2e; font-family: monospace; color: #eee; }
+    h1 { margin: 20px 0; color: #48dbfb; }
+    canvas { border: 3px solid #0f3460; border-radius: 10px; image-rendering: pixelated; }
+    .controls { margin: 20px 0; display: flex; gap: 10px; }
+    button { padding: 12px 24px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; }
+    .btn-fire { background: #ff6b6b; color: white; }
+    .btn-explosion { background: #feca57; color: #333; }
+    .btn-ice { background: #48dbfb; color: white; }
+    .btn-lightning { background: #a55eea; color: white; }
+    .btn-heal { background: #26de81; color: white; }
+  </style>
+</head>
+<body>
+  <h1>pixelfx Demo</h1>
+  <canvas id="game" width="512" height="512"></canvas>
+  <div class="controls">
+    <button class="btn-fire" onclick="playEffect('fire')">🔥 Fire</button>
+    <button class="btn-explosion" onclick="playEffect('explosion')">💥 Explosion</button>
+    <button class="btn-ice" onclick="playEffect('ice')">❄️ Ice</button>
+    <button class="btn-lightning" onclick="playEffect('lightning')">⚡ Lightning</button>
+    <button class="btn-heal" onclick="playEffect('heal')">💚 Heal</button>
+  </div>
+  
+  <script type="module">
+    import { EffectManager, Rng } from '../../src/shared/effects/index.js';
+    
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const manager = new EffectManager(512, 512);
+    
+    const effects = {
+      fire: {
+        create(options) {
+          const rng = new Rng(options.seed || 42);
+          const particles = Array.from({ length: 50 }, () => ({
+            x: 256 + rng.range(-30, 30), y: 400,
+            vx: rng.range(-20, 20), vy: rng.range(-150, -80),
+            life: rng.range(0.5, 1.5), maxLife: 1.5, size: rng.range(8, 20),
+          }));
+          return {
+            update(dt) { particles.forEach(p => { p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt; if (p.life<=0) { p.life=p.maxLife; p.x=256+rng.range(-30,30); p.y=400; } }); },
+            draw(painter) { particles.forEach(p => { const a=p.life/p.maxLife; painter.circle(p.x,p.y,p.size*a,0xff6b6b); painter.circle(p.x,p.y,p.size*a*1.5,0xff6600,true); }); }
+          };
+        }
+      },
+      explosion: {
+        create(options) {
+          const rng = new Rng(options.seed || 42);
+          const particles = Array.from({ length: 100 }, () => { const ang=rng.angle(), spd=rng.range(100,300); return { x:256,y:256,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:rng.range(0.3,1),maxLife:1,size:rng.range(5,15) }; });
+          return {
+            update(dt) { particles.forEach(p => { p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; p.vx*=0.95; p.vy*=0.95; }); },
+            draw(painter) { particles.forEach(p => { if(p.life>0){const a=p.life/p.maxLife; painter.circle(p.x,p.y,p.size*a,0xfeca57); painter.circle(p.x,p.y,p.size*a*2,0xffaa00,true);} }); }
+          };
+        }
+      },
+      ice: {
+        create(options) {
+          const rng = new Rng(options.seed || 42);
+          const particles = Array.from({ length: 80 }, () => ({ x:256+rng.range(-100,100), y:256+rng.range(-100,100), vx:rng.range(-50,50), vy:rng.range(-50,50), life:rng.range(1,2), maxLife:2, size:rng.range(3,10) }));
+          return {
+            update(dt) { particles.forEach(p => { p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; if(p.life<=0){p.life=p.maxLife; p.x=256+rng.range(-100,100); p.y=256+rng.range(-100,100);} }); },
+            draw(painter) { particles.forEach(p => { const a=p.life/p.maxLife; painter.circle(p.x,p.y,p.size*a,0x48dbfb); painter.circle(p.x,p.y,p.size*a*1.5,0x44ddff,true); }); }
+          };
+        }
+      },
+      lightning: {
+        create(options) {
+          const rng = new Rng(options.seed || 42);
+          return {
+            update() {},
+            draw(painter) { for(let i=0;i<5;i++){let x=100+rng.range(0,300),y=0; for(let j=0;j<20;j++){painter.circle(x,y,5,0xffffff); painter.circle(x,y,10,0xa55eea,true); x+=rng.range(-30,30); y+=25;}} }
+          };
+        }
+      },
+      heal: {
+        create(options) {
+          const rng = new Rng(options.seed || 42);
+          const particles = Array.from({ length: 60 }, () => ({ x:256+rng.range(-80,80), y:400, vx:rng.range(-20,20), vy:rng.range(-100,-50), life:rng.range(1,2), maxLife:2, size:rng.range(5,12) }));
+          return {
+            update(dt) { particles.forEach(p => { p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; if(p.life<=0){p.life=p.maxLife; p.x=256+rng.range(-80,80); p.y=400;} }); },
+            draw(painter) { particles.forEach(p => { const a=p.life/p.maxLife; painter.circle(p.x,p.y,p.size*a,0x26de81); painter.circle(p.x,p.y,p.size*a*1.5,0x26de81,true); }); }
+          };
+        }
+      }
+    };
+    
+    let currentEffectId = null;
+    window.playEffect = (name) => {
+      if (currentEffectId) manager.remove(currentEffectId);
+      currentEffectId = manager.create(name, effects[name], { seed: 42 });
+    };
+    
+    let lastTime = performance.now();
+    function gameLoop(time) {
+      const dt = (time - lastTime) / 1000;
+      lastTime = time;
+      manager.update(dt);
+      manager.draw();
+      manager.composite(ctx);
+      requestAnimationFrame(gameLoop);
+    }
+    
+    requestAnimationFrame(gameLoop);
+    setTimeout(() => playEffect('fire'), 500);
+  </script>
+</body>
+</html>
