@@ -728,6 +728,15 @@ const en = {
     chooseMechanic: "Choose mechanic",
     mechanicRequired: "Choose a game mechanic before creating the game.",
     gameMechanicMenu: "Game mechanic list",
+    mechanicTierCore: "Core",
+    mechanicTierCoreHint:
+      "Low art load: geometry or icon assets with code-driven animation. Production workhorses.",
+    mechanicTierWatch: "Conditional",
+    mechanicTierWatchHint:
+      "One-time illustration or physics-feel cost. Build when the budget allows.",
+    mechanicTierShrink: "Deprioritized",
+    mechanicTierShrinkHint:
+      "High art cost: per-level art growth or character/frame-by-frame animation. Default skip.",
   },
   createDialog: {
     restartForFolders:

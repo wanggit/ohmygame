@@ -10,7 +10,7 @@ import { ModelSelector, useAgentModels } from "./model-selector.js";
 import { matchesPlanCommand, PlanModeIndicator } from "./plan-mode-control.js";
 import { PromptBox, type DroppedFile } from "./prompt-box.js";
 import { PROJECT_TYPES, ProjectTypeIcon, type ProjectTypeOption } from "./project-types.js";
-import { CASUAL_MECHANICS, casualMechanicLabel, mechanicCreationBrief, type CasualMechanic } from "../shared/casual-mechanics.js";
+import { casualMechanicLabel, mechanicsGroupedByTier, mechanicCreationBrief, type CasualMechanic, type CasualMechanicTier } from "../shared/casual-mechanics.js";
 import { useComposerContextMenu } from "./composer-context-menu.js";
 import { activePluginMentions, extractLeadingPluginMention, formatComposerInvocation, formatSkillInvocation, insertMention, parseSkillInvocation, toPluginMention, type ComposerMention, type ComposerMentionQuery } from "./composer-mentions.js";
 import { createPromptHistory, loadHomePromptHistory, nextPrompt, previousPrompt, saveHomePrompt } from "./prompt-history.js";
@@ -615,6 +615,55 @@ function ProjectTypeSelector({ value, options, disabled, onChange }: {
   );
 }
 
+const MECHANIC_TIER_LABEL_KEYS = {
+  core: "creator.mechanicTierCore",
+  watch: "creator.mechanicTierWatch",
+  shrink: "creator.mechanicTierShrink",
+} as const satisfies Record<CasualMechanicTier, string>;
+
+const MECHANIC_TIER_HINT_KEYS = {
+  core: "creator.mechanicTierCoreHint",
+  watch: "creator.mechanicTierWatchHint",
+  shrink: "creator.mechanicTierShrinkHint",
+} as const satisfies Record<CasualMechanicTier, string>;
+
+/** 玩法菜单体：按美术/动画负担分圈分组（core → watch → shrink），供 MechanicSelector 与测试使用。 */
+export function MechanicMenuList({ value, onSelect }: {
+  value?: CasualMechanic;
+  onSelect: (value: CasualMechanic) => void;
+}) {
+  return (
+    <>
+      {mechanicsGroupedByTier().map(({ tier, mechanics }) => (
+        <div
+          key={tier}
+          className="home-mechanic-tier-group"
+          role="group"
+          aria-label={t(MECHANIC_TIER_LABEL_KEYS[tier])}
+        >
+          <div
+            className="home-mechanic-tier-label"
+            role="presentation"
+            title={t(MECHANIC_TIER_HINT_KEYS[tier])}
+          >
+            {t(MECHANIC_TIER_LABEL_KEYS[tier])}
+          </div>
+          {mechanics.map((option) => {
+            const selected = option.id === value?.id;
+            return (
+              <button className={selected ? "is-active" : undefined} type="button" role="menuitemradio" aria-checked={selected} key={option.id} onClick={() => onSelect(option)}>
+                <Gamepad2 size={14} aria-hidden="true" />
+                <span>{casualMechanicLabel(option)}</span>
+                {selected ? <Check size={13} aria-hidden="true" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </>
+  );
+}
+
 function MechanicSelector({ value, disabled, onChange }: {
   value?: CasualMechanic;
   disabled?: boolean;
@@ -690,20 +739,14 @@ function MechanicSelector({ value, disabled, onChange }: {
             items[nextIndex]?.focus();
           }}
         >
-          {CASUAL_MECHANICS.map((option) => {
-            const selected = option.id === value?.id;
-            return (
-              <button className={selected ? "is-active" : undefined} type="button" role="menuitemradio" aria-checked={selected} key={option.id} onClick={() => {
-                onChange(option);
-                setOpen(false);
-                trigger.current?.focus();
-              }}>
-                <Gamepad2 size={14} aria-hidden="true" />
-                <span>{casualMechanicLabel(option)}</span>
-                {selected ? <Check size={13} aria-hidden="true" /> : null}
-              </button>
-            );
-          })}
+          <MechanicMenuList
+            value={value}
+            onSelect={(option) => {
+              onChange(option);
+              setOpen(false);
+              trigger.current?.focus();
+            }}
+          />
         </div>
       ) : null}
     </div>

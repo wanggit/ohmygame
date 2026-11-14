@@ -3308,6 +3308,25 @@ button.home-nav-item-active:hover {
   overflow-y: auto;
 }
 
+.home-mechanic-tier-group + .home-mechanic-tier-group {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.home-mechanic-tier-label {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--menu-surface);
+  cursor: default;
+}
+
 .home-workspace-trigger > span {
   max-width: 140px;
   overflow: hidden;

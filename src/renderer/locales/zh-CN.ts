@@ -709,6 +709,12 @@ const zhCN: typeof en = {
     chooseMechanic: "选择游戏玩法",
     mechanicRequired: "请先选择游戏玩法，再开始做新游戏。",
     gameMechanicMenu: "游戏玩法列表",
+    mechanicTierCore: "核心圈",
+    mechanicTierCoreHint: "美术负担最低：几何/图标素材 + 代码动画即可成立，量产主力。",
+    mechanicTierWatch: "观察圈",
+    mechanicTierWatchHint: "有条件地做：一次性插画成本或物理手感成本，预算允许再做。",
+    mechanicTierShrink: "收缩圈",
+    mechanicTierShrinkHint: "默认不做：素材量随关卡增长，或依赖角色/逐帧动画。",
   },
   createDialog: {
     restartForFolders: "请重启 OhMyGame 桌面应用以启用文件夹选择。",
