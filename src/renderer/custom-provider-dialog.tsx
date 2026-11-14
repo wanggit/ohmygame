@@ -1,4 +1,5 @@
 import { usesModel3DPresets } from "../shared/model3d-presets.js";
+import { AGENT_PLAN_BASE_URL, agentPlanPresetModels, usesAgentPlanPresets } from "../shared/agent-plan-models.js";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { AGENT_REASONING_LEVELS, CUSTOM_MODEL_APIS, type CustomProviderDetails, type CustomProviderModel, type SaveCustomProviderRequest, type CustomProviderPreset } from "../shared/contracts.js";
@@ -26,9 +27,6 @@ const emptyModel = (provider: Pick<SaveCustomProviderRequest, "api" | "preset">)
 });
 
 type CustomProviderTemplate = "generic" | "volcengine-agent-plan";
-
-/** Ark Agent Plan subscription gateway: same protocols as the metered Ark API behind a dedicated Base URL and key. */
-const AGENT_PLAN_BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3";
 
 export type CustomProviderField = "name" | "baseUrl" | "api" | "apiKey" | "models";
 
@@ -71,7 +69,7 @@ export function CustomProviderForm({ settings, initialProvider, initialFocus = "
   const [discoveryWarnings, setDiscoveryWarnings] = useState<string[]>([]);
   const [truncated, setTruncated] = useState(false);
   const [fetchedCount, setFetchedCount] = useState<number>();
-  const [discoverySource, setDiscoverySource] = useState<"provider" | "presets">("provider");
+  const [discoverySource, setDiscoverySource] = useState<"provider" | "presets" | "plan">("provider");
   const usesPresets = usesModel3DPresets(form.baseUrl, form.preset);
   const [manualOpen, setManualOpen] = useState(false);
   const [manual, setManual] = useState<CustomProviderModel>(() => emptyModel(form));
@@ -133,7 +131,11 @@ export function CustomProviderForm({ settings, initialProvider, initialFocus = "
   }
 
   async function fetchModels(): Promise<void> {
-    if (!endpointInput.current?.reportValidity() || (keyInput.current && !keyInput.current.reportValidity())) return;
+    if (!endpointInput.current?.reportValidity()) return;
+    // The Agent Plan endpoint has no `/models` listing; load the bundled plan
+    // catalog locally — no key or network needed.
+    if (usesAgentPlanPresets(form.baseUrl)) { loadAgentPlanModels(); return; }
+    if (keyInput.current && !keyInput.current.reportValidity()) return;
     cancelDiscovery();
     const controller = new AbortController();
     discovery.current = controller;
@@ -151,6 +153,20 @@ export function CustomProviderForm({ settings, initialProvider, initialFocus = "
     } catch (cause) {
       if (!controller.signal.aborted) setDiscoveryError(cause instanceof Error ? cause.message : String(cause));
     } finally { if (!controller.signal.aborted) setFetching(false); }
+  }
+
+  /** The Agent Plan endpoint 404s on `/models`; its catalog is bundled and loaded locally instead. */
+  function loadAgentPlanModels(): void {
+    cancelDiscovery();
+    setDiscoveryError(undefined);
+    setDiscoveryWarnings([]);
+    const known = new Set(rows.map((row) => row.model.id));
+    // Plan models ship with uses preconfigured, so freshly loaded ones start enabled.
+    setRows(mergeDiscoveredProviderModels(rows, agentPlanPresetModels())
+      .map((row) => known.has(row.model.id) ? row : { ...row, enabled: true }));
+    setDiscoverySource("plan");
+    setFetchedCount(agentPlanPresetModels().length);
+    setTruncated(false);
   }
 
   function updateModel(id: string, model: CustomProviderModel): void {
@@ -237,11 +253,11 @@ export function CustomProviderForm({ settings, initialProvider, initialFocus = "
           <section className="custom-provider-model-picker" aria-label={t("customProvider.modelSettings")}>
             <div className="custom-provider-model-heading">
               <h3>{t("models.title")} <small>{t("customProvider.enabledCount", { count: enabledCount })}</small></h3>
-              <button ref={fetchButton} className="settings-secondary-button" type="button" disabled={saving || fetching} onClick={() => void fetchModels()}>{fetching ? <LoaderCircle className="spin" size={13} /> : <RefreshCw size={13} />}{fetching ? usesPresets ? t("common.loading") : t("customProvider.fetching") : usesPresets ? t("customProvider.loadPresets") : t("customProvider.fetch")}</button>
+              <button ref={fetchButton} className="settings-secondary-button" type="button" disabled={saving || fetching} onClick={() => void fetchModels()}>{fetching ? <LoaderCircle className="spin" size={13} /> : <RefreshCw size={13} />}{fetching ? usesPresets ? t("common.loading") : t("customProvider.fetching") : usesPresets ? t("customProvider.loadPresets") : usesAgentPlanPresets(form.baseUrl) ? t("customProvider.loadPlanModels") : t("customProvider.fetch")}</button>
             </div>
             {discoveryWarnings.map((warning) => <p className="custom-provider-hint" role="status" key={warning}>{warning}</p>)}
             {discoveryError ? <p className="project-settings-error" role="alert">{discoveryError}</p> : null}
-            {fetchedCount !== undefined ? <p className="custom-provider-hint" role="status">{truncated ? t("customProvider.fetchedFirst", { count: fetchedCount }) : discoverySource === "presets" ? t("customProvider.loadedPresets", { count: fetchedCount }) : t("customProvider.fetchedModels", { count: fetchedCount })}</p> : null}
+            {fetchedCount !== undefined ? <p className="custom-provider-hint" role="status">{truncated ? t("customProvider.fetchedFirst", { count: fetchedCount }) : discoverySource === "presets" ? t("customProvider.loadedPresets", { count: fetchedCount }) : discoverySource === "plan" ? t("customProvider.loadedPlanModels", { count: fetchedCount }) : t("customProvider.fetchedModels", { count: fetchedCount })}</p> : null}
             {rows.length ? <>
               <label className="custom-provider-model-search"><Search size={14} /><input ref={modelSearch} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("models.search")} aria-label={t("models.search")} disabled={saving} /></label>
               {visibleModels.length ? <>

@@ -91,4 +91,28 @@ describe("custom provider template", () => {
     expect((labelControl("Image protocol") as HTMLSelectElement).value).toBe("volcengine-images");
     expect((labelControl("Video protocol") as HTMLSelectElement).value).toBe("seedance");
   });
+
+  it("loads the bundled plan catalog in place of fetching (the plan endpoint has no /models)", async () => {
+    const request = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", request);
+    await act(async () => root.render(<CustomProviderForm onClose={() => {}} onSaved={() => {}} />));
+    const template = labelControl("Provider template") as HTMLSelectElement;
+    await act(async () => {
+      template.value = "volcengine-agent-plan";
+      template.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    const load = [...host.querySelectorAll("button")].find((button) => button.textContent === "Load plan models")!;
+    expect(load).toBeDefined();
+    await act(async () => load.click());
+
+    // Local catalog load: no HTTP round trip and no discovery error.
+    expect(request).not.toHaveBeenCalled();
+    expect(host.textContent).not.toContain("Fetching models failed");
+    expect(host.textContent).toContain("Loaded 18 Agent Plan models");
+    for (const name of ["Doubao Seed 2.1 Pro", "Doubao Seedream 5.0 Pro", "Doubao Seedance 2.5"]) {
+      expect(host.textContent).toContain(name);
+    }
+    expect(host.textContent).toContain("18 enabled");
+  });
 });
