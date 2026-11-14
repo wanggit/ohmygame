@@ -135,9 +135,10 @@ the plan.
 
 To use it, add a custom provider and pick the **Volcengine Ark Agent Plan
 (subscription)** template, which prefills the Base URL
-`https://ark.cn-beijing.volces.com/api/plan/v3` and presets the media protocols to
-Seedream and Seedance. Then add the plan's model IDs manually (the plan endpoint has
-no `/models` discovery), for example:
+`https://ark.cn-beijing.volces.com/api/plan/v3`. The media protocol is a per-model
+setting: tick a model's Image or Video use and the protocol picker below it is
+preselected to Seedream/Seedance by the template. Then add the plan's model IDs
+manually (the plan endpoint has no `/models` discovery), for example:
 
 | Use | Model IDs | Settings |
 | --- | --- | --- |

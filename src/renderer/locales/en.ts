@@ -439,7 +439,7 @@ const en = {
     templateGeneric: "Generic OpenAI-compatible",
     templateGenericHint: "Any OpenAI-compatible endpoint.",
     templateAgentPlan: "Volcengine Ark Agent Plan (subscription)",
-    templateAgentPlanHint: "Fills in the Agent Plan Base URL and the Seedream/Seedance media protocols. Use the dedicated Agent Plan API key and add your plan's model IDs manually, for example doubao-seedream-5-0-pro or doubao-seedance-2.0.",
+    templateAgentPlanHint: "Fills in the Agent Plan Base URL. After adding a model, tick its Image or Video use — the protocol picker below is then preselected to Seedream/Seedance and needs no change. Use the dedicated Agent Plan API key and add your plan's model IDs manually, for example doubao-seedream-5-0-pro or doubao-seedance-2.0.",
     defaultProtocol: "Default language protocol",
     authentication: "Authentication",
     noApiKey: "No API key",

@@ -431,7 +431,7 @@ const zhCN: typeof en = {
     templateGeneric: "通用 OpenAI 兼容",
     templateGenericHint: "任意 OpenAI 兼容端点。",
     templateAgentPlan: "火山方舟 Agent Plan（订阅套餐）",
-    templateAgentPlanHint: "自动填入 Agent Plan 专属 Base URL，并将媒体协议预设为 Seedream/Seedance。请使用 Agent Plan 专属 API Key，模型 ID 按套餐手动添加，例如 doubao-seedream-5-0-pro、doubao-seedance-2.0。",
+    templateAgentPlanHint: "自动填入 Agent Plan 专属 Base URL。添加模型后，勾选该模型的图片或视频用途，下方出现的协议下拉已自动预设为 Seedream/Seedance，无需修改。请使用 Agent Plan 专属 API Key，模型 ID 按套餐手动添加，例如 doubao-seedream-5-0-pro、doubao-seedance-2.0。",
     defaultProtocol: "默认语言模型协议",
     authentication: "认证方式",
     noApiKey: "无需 API 密钥",

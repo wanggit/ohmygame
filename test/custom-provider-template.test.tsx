@@ -62,4 +62,33 @@ describe("custom provider template", () => {
     });
     expect((labelControl("Base URL") as HTMLInputElement).value).toBe("https://relay.example/v1");
   });
+
+  it("preselects Seedream/Seedance protocols when a use is ticked on a manual model", async () => {
+    await act(async () => root.render(<CustomProviderForm onClose={() => {}} onSaved={() => {}} />));
+    const template = labelControl("Provider template") as HTMLSelectElement;
+    await act(async () => {
+      template.value = "volcengine-agent-plan";
+      template.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    // The manual add section requires a model ID before its fields enable.
+    const modelId = labelControl("Model ID") as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(modelId, "doubao-seedream-5-0-pro");
+      modelId.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const useBox = (caption: string): HTMLInputElement => {
+      const label = [...host.querySelectorAll("label")].find((entry) => entry.textContent === caption);
+      if (!label) throw new Error(`Missing use checkbox ${caption}`);
+      return label.querySelector("input")!;
+    };
+    await act(async () => useBox("Image").click());
+    await act(async () => useBox("Video").click());
+
+    // The media protocol pickers appear under the use checkboxes, preselected
+    // by the Agent Plan template — this is the setting users look for.
+    expect((labelControl("Image protocol") as HTMLSelectElement).value).toBe("volcengine-images");
+    expect((labelControl("Video protocol") as HTMLSelectElement).value).toBe("seedance");
+  });
 });
