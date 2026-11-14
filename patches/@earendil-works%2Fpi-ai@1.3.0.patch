@@ -317,10 +317,10 @@ index 0000000..53fb4cb
 +    output.diagnostics = [...(output.diagnostics ?? []), createProviderFailureDiagnostic(error, endpoint, response)];
 +}
 diff --git a/dist/utils/retry.js b/dist/utils/retry.js
-index d1da13a..88781c1 100644
+index d1da13a..23e8005 100644
 --- a/dist/utils/retry.js
 +++ b/dist/utils/retry.js
-@@ -193,6 +193,13 @@ export async function retryAssistantCall(produce, policy, signal, callbacks) {
+@@ -193,8 +193,26 @@ export async function retryAssistantCall(produce, policy, signal, callbacks) {
  export function isRetryableAssistantError(message) {
      if (message.stopReason !== "error" || !message.errorMessage)
          return false;
@@ -334,3 +334,17 @@ index d1da13a..88781c1 100644
      const errorMessage = message.errorMessage;
      if (NON_RETRYABLE_PROVIDER_LIMIT_ERROR_PATTERN.test(errorMessage))
          return false;
+-    return RETRYABLE_PROVIDER_ERROR_PATTERN.test(errorMessage);
++    if (RETRYABLE_PROVIDER_ERROR_PATTERN.test(errorMessage))
++        return true;
++    // Gateways can wrap an upstream failure in an HTTP 2xx response and report the
++    // real failure only in the body (for example HTTP 200 carrying error code 400
++    // with "Invalid request parameters"). The HTTP layer accepted the request, so a
++    // body-level rejection is a transient gateway/upstream condition worth retrying.
++    // Authoritative non-2xx rejections keep the wording rules above and stay
++    // non-retryable, and a WebSocket adapter's synthetic 200 is not a real status.
++    return message.diagnostics?.some((diagnostic) => diagnostic.type === "provider_failure"
++        && typeof diagnostic.details?.status === "number"
++        && diagnostic.details.status >= 200 && diagnostic.details.status < 300
++        && diagnostic.details?.transport !== "websocket") ?? false;
+ }

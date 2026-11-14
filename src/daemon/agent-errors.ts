@@ -82,7 +82,14 @@ export function thrownAgentError(cause: unknown): ThreadItemError {
 function classifyAgentError(message: string, diagnostics: AgentErrorDiagnostics): ThreadItemErrorCode | undefined {
   const text = `${diagnostics.errorCode ?? ""} ${message}`;
   const legacyStatus = message.match(/^(?:([45]\d\d)(?::|\s)|[^()\n]*\(([45]\d\d)\)\s*:)/);
-  const status = diagnostics.statusCode ?? Number(legacyStatus?.[1] ?? legacyStatus?.[2]);
+  const httpStatus = diagnostics.statusCode ?? Number(legacyStatus?.[1] ?? legacyStatus?.[2]);
+  // Gateways can wrap the real failure in an HTTP 2xx response and report it as a
+  // numeric error code (for example HTTP 200 with error code 400). Classify from
+  // that wrapped code instead of leaving the failure unknown.
+  const wrappedStatus = /^[45]\d\d$/.test(diagnostics.errorCode ?? "") ? Number(diagnostics.errorCode) : NaN;
+  const status = (!Number.isFinite(httpStatus) || (httpStatus >= 200 && httpStatus < 300)) && Number.isFinite(wrappedStatus)
+    ? wrappedStatus
+    : httpStatus;
   const causes = diagnostics.causes ?? [];
   const transportText = [message, ...causes.flatMap((cause) => [cause.name, cause.message])].filter(Boolean).join(" ");
   const codes = [diagnostics.errorCode, ...causes.map((cause) => cause.code)].filter(Boolean).join(" ").toUpperCase();

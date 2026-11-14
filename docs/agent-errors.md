@@ -36,15 +36,18 @@ The application converts Pi messages and thrown errors into the same
 `ThreadItemError` directly. Only the daemon classifies failures; the renderer
 maps its code to a title and guidance. Structured HTTP status takes precedence
 over generic wording, with explicit quota codes distinguished from rate limits.
+Gateways that wrap the real failure in an HTTP 2xx response and report it as a
+numeric error code (for example HTTP 200 with error code 400) are classified
+from that wrapped code; without one, the failure stays unclassified.
 Transport classification uses the saved cause codes, names and messages, so SDKs
 without native error codes still give useful diagnostics.
 
 ## Pi compatibility patch
 
-The pinned `@earendil-works/pi-ai@1.2.0` loses nested connection causes when it
+The pinned `@earendil-works/pi-ai@1.3.0` loses nested connection causes when it
 converts SDK errors into `AssistantMessage.errorMessage`. For example, the OpenAI
 SDK wraps DNS and TLS failures alike as `Connection error.`. The Bun patch in
-`patches/@earendil-works%2Fpi-ai@1.2.0.patch` captures public error metadata in Pi's
+`patches/@earendil-works%2Fpi-ai@1.3.0.patch` captures public error metadata in Pi's
 existing `AssistantMessage.diagnostics` before conversion.
 
 The patch covers the OpenAI completions and Responses adapters (including Codex
@@ -54,6 +57,10 @@ replace provider implementations or alter `errorMessage`. Pi retains its bounded
 retry and context recovery policies. The retry classifier additionally respects
 authoritative WebSocket authentication, quota and request rejection diagnostics;
 words such as a parameter named `timeout` cannot make these errors retryable.
+A failure wrapped in an HTTP 2xx response whose body carries the real rejection
+(for example HTTP 200 with error code 400) is treated as a transient
+gateway/upstream condition and stays retryable; authoritative non-2xx rejections
+keep the wording rules and stay non-retryable.
 Context-compaction errors and third-party adapters
 can still return only a message; those failures use the available message as a
 fallback.
@@ -85,8 +92,9 @@ removing or adapting the patch. Prefer an upstream implementation of the shared
 failure diagnostic helper and adapter hooks over a permanent fork.
 Every Pi upgrade must also recheck the WebSocket retry classifier: authoritative
 authentication, quota and invalid-request failures remain non-retryable, ordinary
-429 rate limits and transient provider failures remain retryable, and context
-overflow still enters compaction. Keep these checks after a clean dependency install.
+429 rate limits and transient provider failures remain retryable, HTTP 2xx
+wrapped body rejections remain retryable, and context overflow still enters
+compaction. Keep these checks after a clean dependency install.
 
 Run `test/provider-error-diagnostics.test.ts` to exercise real Pi adapters with
 offline fetch fixtures, and the agent error, agent manager and timeline tests to

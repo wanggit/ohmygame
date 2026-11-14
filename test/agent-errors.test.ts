@@ -81,6 +81,17 @@ describe("agent error diagnostics", () => {
     expect(agentErrorPresentation(error).title).toBe("Model request failed");
   });
 
+  it("classifies a gateway failure wrapped in an HTTP 2xx response by its numeric error code", () => {
+    expect(normalizeAgentError("Invalid request parameters", { statusCode: 200, errorCode: "400" }).code).toBe("invalid_request");
+    expect(normalizeAgentError("Internal gateway failure", { statusCode: 200, errorCode: "503" }).code).toBe("provider_unavailable");
+    expect(normalizeAgentError("Wrapped quota failure", { statusCode: 200, errorCode: "402" }).code).toBe("quota_exceeded");
+    // Without a numeric wrapped code the failure stays honestly unknown.
+    expect(normalizeAgentError("Something unexpected happened", { statusCode: 200 }).code).toBeUndefined();
+    expect(normalizeAgentError("Something unexpected happened", { statusCode: 200, errorCode: "invalid_request_error" }).code).toBeUndefined();
+    // An authoritative HTTP rejection keeps its own status instead of the wrapped code.
+    expect(normalizeAgentError("Invalid parameter", { statusCode: 401, errorCode: "400" }).code).toBe("authentication_failed");
+  });
+
   it.each([
     ["self signed certificate", "tls_error"],
     ["getaddrinfo failed", "dns_error"],

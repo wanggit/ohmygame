@@ -67,6 +67,25 @@ describe("patched Pi provider failures", () => {
     expect(assistantMessageError(message)).toMatchObject({ code: "stream_error", diagnostics: { statusCode: 200, requestId: "req-stream" } });
   });
 
+  it("retries a gateway failure wrapped in a successful HTTP response", async () => {
+    const message = await completions(model, context, { apiKey: "test-only", maxRetries: 0, fetch: async () => new Response(
+      `data: ${JSON.stringify({ error: { code: 400, type: "Error", message: "Invalid request parameters" } })}\n\ndata: [DONE]\n\n`,
+      { headers: { "content-type": "text/event-stream", "x-request-id": "req-wrapped" } },
+    ) }).result();
+    expect(message.errorMessage).toContain("Invalid request parameters");
+    expect(isRetryableAssistantError(message)).toBe(true);
+    expect(assistantMessageError(message)).toMatchObject({ code: "invalid_request", diagnostics: { statusCode: 200, errorCode: "400" } });
+  });
+
+  it("still refuses to retry an authoritative HTTP 400 rejection", async () => {
+    const message = await completions(model, context, { apiKey: "test-only", maxRetries: 0, fetch: async () => new Response(
+      JSON.stringify({ error: { code: "invalid_request_error", message: "Invalid request parameters" } }),
+      { status: 400, headers: { "content-type": "application/json" } },
+    ) }).result();
+    expect(isRetryableAssistantError(message)).toBe(false);
+    expect(assistantMessageError(message)).toMatchObject({ code: "invalid_request", diagnostics: { statusCode: 400 } });
+  });
+
   it("also preserves connection causes in the Responses adapter", async () => {
     const responseModel = { ...model, api: "openai-responses" as const, provider: "openai", baseUrl: "https://example.invalid/v1" };
     const message = await responses(responseModel, context, { apiKey: "test-only", fetch: async () => { throw Object.assign(new Error("connection refused"), { code: "ECONNREFUSED" }); } }).result();
