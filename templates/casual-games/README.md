@@ -67,7 +67,7 @@
 1. **高实现成本**：需要 solver / 关卡生成器 / 标定闭环（如水排序可解性验证、2048 beam 标定）；
 2. **高复用**：题材换皮空间大、计划做 2+ 款。
 
-玩法核 1-2 小时可重写的（两消、翻牌、打砖块等）标 💡：直接做游戏，复用横切基建，做 2-3 款变奏后再评估是否沉淀模板。**横切基建（Bridge 集成、verify 脚手架、自测模式、音效、打包规范）所有玩法通用**——已内置在各模板中，最终目标是抽成共享脚手架（pipeline T10）。
+玩法核 1-2 小时可重写的（两消、翻牌、打砖块等）标 💡：直接做游戏，复用横切基建，做 2-3 款变奏后再评估是否沉淀模板。**横切基建（Bridge 集成、verify 脚手架、自测模式、音效、打击感/juice、打包规范）所有玩法通用**——已内置在各模板中，其中打击感与程序化动画已抽出为共享库 [`shared/juice/`](shared/juice/README.md)（pipeline T10 共享脚手架第一块），其余待抽。
 
 历史判定记录（2026-10-30）：A1 juice-sort ✅ 入选（全系列唯一标「模板定稿」，七轮实测）；B1 fruit-merge ✅ 入选（B 系列标杆，50 关 + beam 标定 + verify 41 项）；A2/A3/B2 ⏭️ 不收（A1/B1 派生款，冗余）；D1 satisfying-slice ⏳ 最近候选（未定稿，定稿后作为 Slice 母版收入）；D2/E1 ⏳ 未定稿；F1 flip-bottle 🚫 设计不合格（复合判定违反 DoD 禁令）。
 
@@ -94,7 +94,7 @@
 
 ## 实例化流程（新游戏 = 复制 + 换主题层 + 重标定）
 
-1. **复制模板**到目标项目目录（如 `~/projects/casual-games/<new-game>/`）；`node_modules/`、`dist/` 不带。
+1. **复制模板**到目标项目目录（如 `~/projects/casual-games/<new-game>/`）；`node_modules/`、`dist/` 不带；同时把 [`shared/juice/`](shared/juice/README.md) 复制进游戏（如 `src/juice/`）。
 2. **改名**：`package.json` 的 `name`、`index.html` 的 `<title>`、README 标题。
 3. **换主题层**（唯一换皮位）：`src/config.ts` 配色/文案/主题绘制、`public/` 素材。
    变体质量线：美术焕新或玩法创新**至少占一样**，纯换色不算可发布产品。
@@ -113,4 +113,6 @@
 - `?step/?win/?anim/?stream` 自测模式：浏览器实测闭环（详见各模板 README）。
 - Bridge 三坑修复已内置（initialize/storage 超时兜底），**不要移除**。
 - 素材全部可商用，禁止引入 IP 侵权素材；AI 生成美术保留生成记录。
+- **美术风格线**：量产风格限扁平/矢量/简约与干净描边卡通（AI 生成一致性最好、休闲玩家接受度高）；写实渲染与逐帧像素动画不进量产线（风格漂移与逐帧成本不可控）。跨素材风格一致性用**风格锚点**（reference sheet：主角 + 配色板 + 场景 + UI 各一）制度保证——所有生成带锚点参考、变体从已批准帧衍生，详见 sprite-pipeline 技能的 Art Style Policy / Style Anchor 章节。
+- **打击感与程序化动画**：[`shared/juice/`](shared/juice/README.md)（hit-stop、震动、挤压拉伸、部件骨骼动画 walkCycle/idlePose）为共享库，实例化时复制到游戏项目（如 `src/juice/`）使用；角色走路/待机优先用部件骨骼 + 代码摆动，不生成 sprite sheet。
 - 发布打包遵循 pipeline DoD：静态 build、资源全本地化、首载 ≤ 50MB。
