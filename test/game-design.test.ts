@@ -311,7 +311,7 @@ describe("Markdown design workspace", () => {
     const generate = vi.fn(fakeGenerator.generate);
     const { store, project, boardId, node, tools, projects } = await runtime({ generate }, projectType);
     const doc = await store.createDocument(project.id, "Visual direction");
-    await store.save(project.id, { ...doc.document, markdown: "A bright garden" }, doc.revision, doc.document.id);
+    await store.save(project.id, { ...doc.document, markdown: "A bright garden\n\n## Why players choose this game\n\nA bright garden theme stands out among similar games.\n\n## Skills and capabilities required\n\n- Art generation: available" }, doc.revision, doc.document.id);
     await mkdir(path.join(project.workspacePath, "assets"), { recursive: true });
     await writeFile(path.join(project.workspacePath, "assets/reference.png"), "local reference");
     await writeFile(path.join(project.workspacePath, "canvas/assets.json"), JSON.stringify({ version: 1, assets: { gardener: { name: "Gardener reference", description: "Character direction", path: "assets/reference.png" } } }));

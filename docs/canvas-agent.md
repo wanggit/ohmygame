@@ -162,6 +162,15 @@ confirmation exists, agent media tools (`generate_canvas_media` and the media
 generation tools of the active coding agent) are blocked with guidance instead
 of running.
 
+The main design document must answer two questions in dedicated sections
+before confirmation succeeds: **Why players choose this game** (how the game
+differs from similar games with mature gameplay — theme, art, mechanical
+variation, feel, audience) and **Skills and capabilities required** (the skills
+building the game needs and their availability: available, tool-producible,
+externally needed, or missing). `confirmMainDesign` rejects a document missing
+either section and reports which ones; heading matching accepts English and
+Chinese wording of these two questions.
+
 The confirmation is stored in `canvas/design-confirmation.json` and records the
 document ID and revision it confirmed. Editing the main design document changes
 its revision, which reopens the gate (`awaiting` with reason `stale`); the user

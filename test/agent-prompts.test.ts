@@ -36,6 +36,28 @@ describe("OhMyGame system prompt", () => {
     }
   });
 
+  it("routes micro-animation to code animation and demands per-frame pose differences", () => {
+    for (const type of ["general", "web-game", "godot-game", "interactive-story", "asset-canvas"] as const) {
+      const text = prompt({ type });
+
+      expect(text).toContain("Reserve multi-frame generation for poses that genuinely change");
+      expect(text).toContain("one generated frame animated in code");
+      expect(text).toContain("explicit per-frame list of concrete drawable pose differences");
+      expect(text).toContain("every frame must be visibly different and no pose may repeat");
+    }
+  });
+
+  it("requires one deterministic post-processing pass on generated art", () => {
+    for (const type of ["general", "web-game", "godot-game", "interactive-story", "asset-canvas"] as const) {
+      const text = prompt({ type });
+
+      expect(text).toContain("Generated art is raw source");
+      expect(text).toContain("one deterministic post-processing pass before integration");
+      expect(text).toContain("provider watermarks and painted-in checkerboards");
+      expect(text).toContain("Unprocessed generator output does not ship");
+    }
+  });
+
   it("appends saved personal preferences after the project contract", () => {
     const base = appendSystemPromptForProject({ type: "web-game" });
     expect(appending([])).toEqual(base);
@@ -102,6 +124,19 @@ describe("OhMyGame system prompt", () => {
     expect(text).toContain('a "start" script');
     expect(text).toContain('Preview runs the "start" script');
     expect(text).toContain("existing folder as the workspace");
+  });
+
+  it("requires the two discussion questions in every game's main design document", () => {
+    for (const type of ["general", "web-game", "godot-game", "interactive-story"] as const) {
+      const text = prompt({ type });
+
+      expect(text).toContain("Why players choose this game");
+      expect(text).toContain("Skills and capabilities required");
+      expect(text).toContain("mature gameplay");
+      expect(text).toContain("instead of building a clone");
+      expect(text).toContain("tool-producible");
+    }
+    expect(prompt({ type: "asset-canvas" })).not.toContain("Why players choose this game");
   });
 
   it("tells the Interactive Story agent how to build, use media in, and check Playable Nodes", () => {

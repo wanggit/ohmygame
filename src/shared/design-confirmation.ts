@@ -31,6 +31,27 @@ export const DESIGN_GATE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "generate_music",
 ]);
 
+/**
+ * Questions every game main design document must answer in dedicated sections.
+ * Heading matching is intentionally loose (English or Chinese wording); the gate
+ * only requires that both questions are answered as explicit sections.
+ */
+export const DESIGN_REQUIRED_SECTIONS: ReadonlyArray<{ heading: string; pattern: RegExp }> = [
+  {
+    heading: "Why players choose this game",
+    pattern: /^#{1,6}\s+.*(?:\bwhy\b[^\n]*\b(players?|this game|choose|pick|us)\b|\b(players?|this game)\b[^\n]*\bchoose\b|(玩家|用户)[^\n]*(为什么|为何)|(为什么|为何)[^\n]*(选|挑)|差异化|卖点)/im,
+  },
+  {
+    heading: "Skills and capabilities required",
+    pattern: /^#{1,6}\s+.*(?:\b(skills?|capabilities)\b[^\n]*\b(required|needs?|needed|requirements?)\b|\b(required|needs?|needed|requirements?)\b[^\n]*\b(skills?|capabilities)\b|(技能|能力)[^\n]*(需求|需要|所需|清单))/im,
+  },
+];
+
+/** Canonical headings of the required sections missing from a main design document's Markdown. */
+export function missingDesignSections(markdown: string): string[] {
+  return DESIGN_REQUIRED_SECTIONS.filter(({ pattern }) => !pattern.test(markdown)).map(({ heading }) => heading);
+}
+
 export function isDesignConfirmationRecord(value: unknown): value is DesignConfirmationRecord {
   if (!value || typeof value !== "object") return false;
   const record = value as DesignConfirmationRecord;
@@ -56,7 +77,7 @@ export function designGateState(
 /** Message returned to the agent when a production tool is blocked. */
 export function designGateBlockReason(state: DesignGateState): string | undefined {
   if (state.status === "confirmed" || state.status === "not-required") return undefined;
-  const guidance = "Discuss the core loop with the user and write the main design document, then tell the user the design is on the Design tab at the top of the workspace and ask them to confirm it (open the Design tab, select the main design document node, Confirm design) before generating any media. Refine the design first; do not work around this gate.";
+  const guidance = "Discuss the core loop with the user and write the main design document — it must include the sections \"Why players choose this game\" and \"Skills and capabilities required\" — then tell the user the design is on the Design tab at the top of the workspace and ask them to confirm it (open the Design tab, select the main design document node, Confirm design) before generating any media. Refine the design first; do not work around this gate.";
   if (state.status === "no-main-document") return `Design gate: this project has no main design document yet. ${guidance}`;
   return `Design gate: the main design document is ${state.reason === "stale" ? "edited since the last confirmation" : "not confirmed"}. ${guidance}`;
 }

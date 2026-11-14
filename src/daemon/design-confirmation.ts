@@ -6,6 +6,7 @@ import {
   designGateRequired,
   designGateState,
   isDesignConfirmationRecord,
+  missingDesignSections,
   type DesignConfirmationRecord,
   type DesignGateState,
 } from "../shared/design-confirmation.js";
@@ -37,10 +38,19 @@ export async function removeDesignConfirmation(workspace: string): Promise<void>
   await rm(path.join(workspace, DESIGN_CONFIRMATION_FILE), { force: true });
 }
 
-/** Confirms the current main design document at its current revision. Throws when no main design exists. */
+/** Confirms the current main design document at its current revision. Throws when no main design exists or required sections are missing. */
 export async function confirmMainDesign(workspace: string): Promise<DesignConfirmationRecord> {
   const main = await mainDesignRevision(workspace);
   if (!main) throw new Error("No main design document exists to confirm. Create the main design document first.");
+  const detail = await readCanvasDocument(workspace, main.documentId);
+  const missing = detail ? missingDesignSections(detail.document.markdown) : [];
+  if (missing.length) {
+    throw new Error(
+      `The main design document must answer two questions in dedicated sections before confirmation. Missing sections: ${missing.join("; ")}. `
+      + 'Add "Why players choose this game" (why players choose this over similar games with mature gameplay) and '
+      + '"Skills and capabilities required" (the skills building this game needs and their availability), then confirm again.',
+    );
+  }
   const record: DesignConfirmationRecord = {
     version: 1,
     documentId: main.documentId,

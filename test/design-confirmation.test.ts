@@ -21,6 +21,7 @@ import {
   designGateBlockReason,
   designGateState,
   isDesignConfirmationRecord,
+  missingDesignSections,
 } from "../src/shared/design-confirmation.js";
 import type { ImageGenerator } from "../src/daemon/openai-image.js";
 import type { ProjectType } from "../src/shared/contracts.js";
@@ -33,6 +34,7 @@ afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 async function temp() { const directory = await mkdtemp(path.join(tmpdir(), "ohmygame-design-gate-")); directories.push(directory); return directory; }
+const REQUIRED_DESIGN_SECTIONS = "## Why players choose this game\n\nA fresh juice theme and tighter feel than other sort games.\n\n## Skills and capabilities required\n\n- Art generation: available";
 const fakeGenerator: ImageGenerator = { generate: async () => ({ bytes: Buffer.from("image"), mediaType: "image/png" }) };
 async function runtime(projectType: ProjectType = "web-game", generator: ImageGenerator = fakeGenerator) {
   const directory = await temp(), library = new AssetLibrary(directory), projects = new ProjectManager(directory, library);
@@ -78,20 +80,40 @@ describe("design gate state", () => {
   });
 });
 
+describe("design required sections", () => {
+  it("reports the sections missing from a design document's Markdown", () => {
+    expect(missingDesignSections("# Core loop\n\nShoot and dodge.")).toEqual(["Why players choose this game", "Skills and capabilities required"]);
+    expect(missingDesignSections("## Why players choose this game\n\nOnly this one.")).toEqual(["Skills and capabilities required"]);
+    expect(missingDesignSections(REQUIRED_DESIGN_SECTIONS)).toEqual([]);
+    expect(missingDesignSections("## Why This Game\n\nA fresh theme.\n\n## Skills needed\n\n- Art: available")).toEqual([]);
+    expect(missingDesignSections("## 玩家为什么选我们\n\n差异化主题。\n\n## 技能需求清单\n\n- 美术：可用")).toEqual([]);
+  });
+  it("refuses to confirm a document that skips either question and accepts one that answers both", async () => {
+    const { project, store } = await runtime();
+    const doc = await store.createDocument(project.id, "Design");
+    const skipped = await store.save(project.id, { ...doc.document, markdown: "## Core loop\n\nShoot and dodge." }, doc.revision, doc.document.id);
+    await expect(confirmMainDesign(project.workspacePath)).rejects.toThrow("Missing sections: Why players choose this game; Skills and capabilities required");
+    await expect(confirmMainDesign(project.workspacePath)).rejects.toThrow("mature gameplay");
+    await store.save(project.id, { ...doc.document, markdown: REQUIRED_DESIGN_SECTIONS }, skipped.revision, doc.document.id);
+    await expect(confirmMainDesign(project.workspacePath)).resolves.toMatchObject({ documentId: doc.document.id });
+  });
+});
+
 describe("design confirmation files", () => {
   it("records the main design revision, stales after edits and forgets on removal", async () => {
     const { project, store } = await runtime();
     expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "no-main-document" });
     await expect(confirmMainDesign(project.workspacePath)).rejects.toThrow("No main design document");
     const doc = await store.createDocument(project.id, "Design");
+    const answered = await store.save(project.id, { ...doc.document, markdown: REQUIRED_DESIGN_SECTIONS }, doc.revision, doc.document.id);
     const main = await mainDesignRevision(project.workspacePath);
-    expect(main).toEqual({ documentId: doc.document.id, revision: doc.revision });
+    expect(main).toEqual({ documentId: doc.document.id, revision: answered.revision });
     expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "awaiting", ...main, reason: "missing" });
     const record = await confirmMainDesign(project.workspacePath);
-    expect(record).toMatchObject({ version: 1, documentId: doc.document.id, revision: doc.revision });
+    expect(record).toMatchObject({ version: 1, documentId: doc.document.id, revision: answered.revision });
     expect(await readDesignConfirmation(project.workspacePath)).toEqual(record);
-    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "confirmed", documentId: doc.document.id, revision: doc.revision, confirmedAt: record.confirmedAt });
-    const saved = await store.save(project.id, { ...doc.document, markdown: "A tighter loop" }, doc.revision, doc.document.id);
+    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "confirmed", documentId: doc.document.id, revision: answered.revision, confirmedAt: record.confirmedAt });
+    const saved = await store.save(project.id, { ...doc.document, markdown: "A tighter loop" }, answered.revision, doc.document.id);
     expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "awaiting", documentId: doc.document.id, revision: saved.revision, reason: "stale" });
     await removeDesignConfirmation(project.workspacePath);
     expect(await readDesignConfirmation(project.workspacePath)).toBeUndefined();
@@ -100,10 +122,11 @@ describe("design confirmation files", () => {
   it("keeps the gate closed when the confirmation file is damaged and exempts asset-canvas", async () => {
     const { project, store } = await runtime();
     const doc = await store.createDocument(project.id, "Design");
+    const answered = await store.save(project.id, { ...doc.document, markdown: REQUIRED_DESIGN_SECTIONS }, doc.revision, doc.document.id);
     await confirmMainDesign(project.workspacePath);
     await writeFile(path.join(project.workspacePath, DESIGN_CONFIRMATION_FILE), "{damaged");
     expect(await readDesignConfirmation(project.workspacePath)).toBeUndefined();
-    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "awaiting", documentId: doc.document.id, revision: doc.revision, reason: "missing" });
+    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "awaiting", documentId: doc.document.id, revision: answered.revision, reason: "missing" });
     const { project: canvasProject } = await runtime("asset-canvas");
     expect(await designGateForProject(canvasProject.workspacePath, canvasProject.type)).toEqual({ status: "not-required" });
     expect(await readDesignConfirmation(canvasProject.workspacePath)).toBeUndefined();
@@ -128,10 +151,11 @@ describe("design confirmation routes", () => {
     expect(failed.json().error).toContain("No main design document");
     const doc = (await app.inject({ method: "POST", url: `${base}/documents`, payload: { title: "Design" } })).json();
     expect((await app.inject(`${base}/design-confirmation`)).json()).toMatchObject({ status: "awaiting", reason: "missing", documentId: doc.document.id });
+    const answered = (await app.inject({ method: "PUT", url: `${base}?documentId=${doc.document.id}`, payload: { ...doc, document: { ...doc.document, markdown: REQUIRED_DESIGN_SECTIONS } } })).json();
     const confirmed = await app.inject({ method: "POST", url: `${base}/design-confirmation`, payload: { action: "confirm" } });
     expect(confirmed.statusCode).toBe(200);
-    expect(confirmed.json()).toMatchObject({ status: "confirmed", documentId: doc.document.id, revision: doc.revision });
-    await app.inject({ method: "PUT", url: `${base}?documentId=${doc.document.id}`, payload: { ...doc, document: { ...doc.document, markdown: "Changed" } } });
+    expect(confirmed.json()).toMatchObject({ status: "confirmed", documentId: doc.document.id, revision: answered.revision });
+    await app.inject({ method: "PUT", url: `${base}?documentId=${doc.document.id}`, payload: { ...answered, document: { ...answered.document, markdown: "Changed" } } });
     expect((await app.inject(`${base}/design-confirmation`)).json()).toMatchObject({ status: "awaiting", reason: "stale" });
     const reset = await app.inject({ method: "POST", url: `${base}/design-confirmation`, payload: { action: "reset" } });
     expect(reset.json()).toMatchObject({ status: "awaiting", reason: "missing" });
@@ -155,6 +179,7 @@ describe("agent media gate", () => {
     detail.board.nodes.push(node); detail.board.editorLayout.nodes[node.id] = node.position;
     await store.saveBoard(project.id, detail.board, detail.revision);
     const doc = await store.createDocument(project.id, "Design");
+    await store.save(project.id, { ...doc.document, markdown: REQUIRED_DESIGN_SECTIONS }, doc.revision, doc.document.id);
     const registered = createAgentTools(project, tools, projects, undefined, undefined, undefined, undefined, store);
     const tool = registered.find((candidate) => candidate.name === "generate_canvas_media")!;
     await expect(tool.execute("blocked", { boardId, nodeId: node.id }, undefined, undefined, {} as never)).rejects.toThrow(/Design gate/);
