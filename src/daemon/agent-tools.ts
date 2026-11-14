@@ -12,6 +12,7 @@ import { getWorkspaceMedia } from "./workspace.js";
 import type { GameRuntimeAdapter, GameUseOpenTarget } from "../shared/playtest.js";
 import type { WebSearchExecution, WebSearchInput } from "../shared/web-search.js";
 import { createGameUseTool } from "./playtest-tools.js";
+import { formatGameVisualReview, type GameVisualReviewReport } from "../shared/game-review.js";
 import { addPlayableNode } from "./playable-add-node.js";
 import { validatePlayableProject } from "./playable-project.js";
 import { PLAYABLE_PRESET_IDS, PLAYABLE_PRESETS } from "./playable-presets.js";
@@ -73,6 +74,15 @@ export type AskQuestionnaire = (
 export type InstallPlugin = (sourcePath: string) => Promise<PluginDetail>;
 export type SearchWeb = (input: WebSearchInput, signal?: AbortSignal) => Promise<WebSearchExecution>;
 
+/**
+ * The independent visual reviewer: plays the game briefly, collects screenshots
+ * and image assets, and has a separate model judge them. Injected so the tool
+ * stays free of model-runtime wiring.
+ */
+export interface GameVisualReviewRunner {
+  run(input: { model?: { provider: string; id: string }; signal?: AbortSignal }): Promise<{ report: GameVisualReviewReport; notes: string[] }>;
+}
+
 /** Personal lessons the user approved, plus the hook that makes them apply to later turns. */
 export interface Remembering {
   store: AgentLearningsStore;
@@ -98,6 +108,7 @@ export function createAgentTools(
   searchWeb?: SearchWeb,
   canvasStore?: CanvasStore,
   remembering?: Remembering,
+  visualReview?: GameVisualReviewRunner,
 ): PiToolDefinition[] {
   const saveGeneratedAudio = async (
     toolId: "generate-speech" | "generate-sound-effect" | "generate-music",
@@ -647,7 +658,26 @@ export function createAgentTools(
       } finally { signal?.removeEventListener("abort", cancel); }
     },
   })] : []), ...(playtest?.driver.available && playtest.driver.capabilities.projectTypes.includes(project.type) && (project.type !== "general" || supportsWebPreview(project))
-    ? [createGameUseTool(playtest.driver, playtest.resolveOpenTarget, { bridge: project.type === "interactive-story" ? "reset" : "full" })]
+    ? [
+        createGameUseTool(playtest.driver, playtest.resolveOpenTarget, { bridge: project.type === "interactive-story" ? "reset" : "full" }),
+        ...(visualReview ? [defineTool({
+          name: "game_review",
+          label: "Review Game Visuals",
+          description: [
+            "Independently review the game's visuals and image assets. It plays the game briefly through the preview runtime, captures gameplay screenshots (desktop and mobile), collects project image assets, and has a separate model judge them against a visual QA rubric.",
+            "Run it after the game builds and before telling the user the game is ready. Fix the player-facing issues it reports; its report is evidence, not a replacement for your own checks.",
+            "By default the project's language model reviews the images in a fresh context. Pass a different model to review with another model; it must accept images.",
+          ].join("\n"),
+          parameters: Type.Object({ model: Type.Optional(mediaModelParameter()) }, { additionalProperties: false }),
+          execute: async (_toolCallId, input, signal) => {
+            const { report, notes } = await visualReview.run({ ...(input.model ? { model: input.model } : {}), ...(signal ? { signal } : {}) });
+            return {
+              content: [{ type: "text", text: formatGameVisualReview(report, notes) }],
+              details: { gameVisualReview: report },
+            };
+          },
+        })] : []),
+      ]
     : [])];
 }
 

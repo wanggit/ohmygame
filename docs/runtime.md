@@ -319,6 +319,28 @@ desktop Computer Use. It provides the smallest stable surface needed for
 repeatable gameplay and visual checks without adding Playwright, Puppeteer, or
 a system Chrome dependency to generated games.
 
+### Independent visual review
+
+Where `game_use` returns evidence to the agent that is building the game, the
+`game_review` tool sends that evidence to a separate model instead. It plays
+the game briefly through the same runtime adapter (initial screen, a start
+click, a few gameplay inputs, and a mobile viewport), collects the project's
+image assets (canvas-generated assets first, then workspace images), and has a
+fresh-context model judge both against a fixed visual QA rubric: blank frames,
+layout and HUD clipping, text readability, art-style coherence, the 3-second
+test, responsive layout, and asset defects such as watermarks, painted-in
+checkerboards, or cutout halos.
+
+The tool returns a structured report (`verdict` of `pass`, `needs-work`, or
+`reject` plus severity-tagged issues with evidence locations) in
+`details.gameVisualReview`. By default the project's language model reviews
+the images; the tool's `model` parameter selects another provider/model, which
+must accept images. Registration matches `game_use`: the runtime adapter must
+be available for the project type. Capture steps degrade gracefully — whatever
+was captured before a failure is still reviewed, and the report's evidence
+notes say what was missed. The review is advisory evidence for the agent and
+the user; it does not gate publishing on its own.
+
 ### Runtime adapter boundary
 
 `game_use` is backed by a typed runtime adapter. The adapter advertises its

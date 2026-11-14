@@ -86,6 +86,37 @@ describe("agent tools", () => {
     expect(createAgentTools(project, runner, projects, undefined, undefined, playtest).some(({ name }) => name === "game_use")).toBe(true);
   });
 
+  it("registers game_review with a visual review runner and returns its report", async () => {
+    const dataDirectory = await mkdtemp(path.join(tmpdir(), "ohmygame-agent-review-"));
+    const projects = new ProjectManager(dataDirectory);
+    await projects.load();
+    const project = await projects.create("Browser Game", "web-game");
+    const runner = new ToolRunner(dataDirectory, { generate: async () => ({ bytes: Buffer.from("image"), mediaType: "image/webp" }) });
+    await runner.load();
+    const driver: GameRuntimeAdapter = {
+      available: true,
+      capabilities: WEB_GAME_USE_CAPABILITIES,
+      request: async () => ({ operation: "closeAll" }),
+      close: () => {},
+    };
+    const playtest = { driver, resolveOpenTarget: async () => ({ runtime: "web" as const, url: "http://127.0.0.1:43210/" }) };
+    const report = { verdict: "needs-work" as const, summary: "HUD clips.", issues: [], screenshotsReviewed: 2, assetsReviewed: 1, model: { provider: "test", id: "reviewer" } };
+    const run = vi.fn(async () => ({ report, notes: [] as string[] }));
+
+    expect(createAgentTools(project, runner, projects, undefined, undefined, playtest).some(({ name }) => name === "game_review")).toBe(false);
+    const tool = createAgentTools(project, runner, projects, undefined, undefined, playtest, undefined, undefined, undefined, { run })
+      .find(({ name }) => name === "game_review");
+    if (!tool) throw new Error("Expected the review tool");
+
+    const result = await tool.execute("call-review", { model: { provider: "test", id: "reviewer" } }, undefined, undefined, {} as never);
+
+    expect(run).toHaveBeenCalledWith({ model: { provider: "test", id: "reviewer" } });
+    expect(result.details).toEqual({ gameVisualReview: report });
+    const text = result.content[0]?.type === "text" ? result.content[0].text : "";
+    expect(text).toContain("verdict: needs-work");
+    expect(text).toContain("HUD clips.");
+  });
+
   it("returns provider metadata from the built-in web search tool", async () => {
     const dataDirectory = await mkdtemp(path.join(tmpdir(), "ohmygame-agent-search-"));
     const projects = new ProjectManager(dataDirectory);

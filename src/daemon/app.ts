@@ -46,6 +46,7 @@ import { isAgentRuntimeId, nativeEffort, type AgentRuntimeId, type AnswerApprova
 import { ConversationManager, sessionDirectory, type StoredConversation } from "./conversations.js";
 import { ConversationImageStore } from "./conversation-images.js";
 import { OwnedPlaytestDriver } from "./owned-playtest.js";
+import { collectGameVisualReviewEvidence, runGameVisualReview } from "./game-visual-review.js";
 import { generateCreativeText, generateDesignDocumentMarkdown, generateDesignTable, generateProjectName } from "./text-generation.js";
 import { ProjectNaming, type ProjectNameGenerator } from "./project-naming.js";
 import { resolveCanvasTextReferences } from "./canvas-text-references.js";
@@ -858,6 +859,13 @@ export function createApp(options: AppOptions = {}) {
       playtest = new OwnedPlaytestDriver(options.playtestDriver);
       agentPlaytests.set(playtestKey, playtest);
     }
+    const resolveOpenTarget = async () => ({
+      runtime: "web" as const,
+      // A web story plays its own page; older stories still use the sandbox.
+      url: project.type === "interactive-story" && !await isWebStory(project.workspacePath)
+        ? await playableDrafts.open(project)
+        : previewPageUrl(await previews.ensureStarted(project, false), "playtest"),
+    });
     return createAgentTools(
       project,
       tools,
@@ -870,17 +878,31 @@ export function createApp(options: AppOptions = {}) {
       },
       playtest ? {
         driver: playtest,
-        resolveOpenTarget: async () => ({
-          runtime: "web",
-          // A web story plays its own page; older stories still use the sandbox.
-          url: project.type === "interactive-story" && !await isWebStory(project.workspacePath)
-            ? await playableDrafts.open(project)
-            : previewPageUrl(await previews.ensureStarted(project, false), "playtest"),
-        }),
+        resolveOpenTarget,
       } : undefined,
       webSearch.enabled() ? (input, signal) => webSearch.search(conversation.summary.id, input, signal) : undefined,
       canvasStore,
       { store: agentLearnings, changed: () => agents.invalidateProjectSessions(project.id) },
+      playtest ? {
+        run: async ({ model: requested, signal }) => {
+          const runtime = await getModelRuntime();
+          const settings = SettingsManager.create(project.workspacePath, piAgentDirectory);
+          const provider = requested?.provider ?? settings.getDefaultProvider();
+          const id = requested?.id ?? settings.getDefaultModel();
+          if (!provider || !id) throw new Error("No language model is configured for the visual review. Connect one in Settings.");
+          if (!providerEnabled(provider)) throw new Error(`Provider ${provider} is disabled. Enable it in Settings to continue.`);
+          const model = resolveModel(runtime, runtime.getModel(provider, id));
+          if (!model || !runtime.hasConfiguredAuth(provider)) throw new Error(`The review model ${provider}/${id} is not available`);
+          const evidence = await collectGameVisualReviewEvidence({
+            driver: playtest,
+            resolveOpenTarget,
+            workspace: project.workspacePath,
+            ...(signal ? { signal } : {}),
+          });
+          const report = await runGameVisualReview(runtime, model, { ...evidence, projectName: project.name, projectType: project.type }, signal);
+          return { report, notes: evidence.notes };
+        },
+      } : undefined,
     );
   };
   /** A conversation run by a coding agent CLI, kept in the same session file and checkpoints as Pi's. */
