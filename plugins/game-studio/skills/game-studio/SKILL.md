@@ -29,6 +29,7 @@ When a required generation tool is unavailable or fails, use a coherent substitu
 ## Design Confirmation Gate
 
 - Agent media generation tools (`generate_canvas_media`, `generate_image`, `generate_video`, `generate_3d_asset`, `animate_3d_asset`, `generate_speech`, `generate_sound_effect`, `generate_music`) are hard-blocked until the user confirms the main design document (Confirm design on its node). With no main design document the gate stays closed — create one, get it confirmed, and do not work around the gate.
+- Confirmation covers the visual direction too: embed at least 2 visual mockups (generated reference images or code-rendered stills) in the main design document before asking for confirmation, so the user confirms look and layout together with the design — prose-only confirmations reliably return as art/layout rework after implementation.
 - The confirmation is anchored to the document revision: editing the main design document reopens the gate. Ask the user to re-confirm before resuming generation.
 - Manual generation from the canvas UI is not blocked; the gate governs agent-driven production only. `asset-canvas` projects are exempt.
 

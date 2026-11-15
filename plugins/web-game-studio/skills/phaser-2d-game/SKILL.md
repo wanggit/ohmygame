@@ -39,6 +39,8 @@ Phaser 4 rebuilt the WebGL renderer, but most gameplay APIs — sprites, groups,
 | `Phaser.GameObjects.Mesh` / `Plane` | removed; use sprites or the newer `Mesh2D` where a mesh is truly required |
 | `DynamicTexture` / `RenderTexture` drawing without a flush | call `.render()` after drawing; v4 no longer flushes implicitly |
 | `ColorMatrix` direct calls | methods moved to the `.colorMatrix` property |
+| `texture.width` / `texture.height` | not on `Texture` in v4 — read the GameObject's `width`/`height`, or `texture.getSourceImage().width/height` |
+| `lineStyle(width, "#ff2d95")` or `fillStyle("#ff2d95")` with a CSS string | Graphics colors must be numbers (`0xff2d95`); CSS color strings are rejected at runtime |
 | `Phaser.CANVAS` renderer fallback | the Canvas renderer is deprecated; target WebGL |
 
 - Compressed textures (KTX / Basis) changed Y-axis orientation in v4 and must be re-compressed. Plain PNG, WebP, or JPEG sprites are unaffected.

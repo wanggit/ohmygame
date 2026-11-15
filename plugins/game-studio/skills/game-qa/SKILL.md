@@ -19,11 +19,23 @@ Match verification to the change and available runtime. Build success establishe
 
 Read the project's existing scripts, test setup, and engine conventions. Prefer its established build and logic checks.
 
-For a configured OhMyGame Web preview, prefer `game_use`. Reuse its session, send real input, inspect runtime errors and failed asset loads, capture representative rendered states, and close the session in the same turn even after failure. OhMyGame owns the preview server; do not leave another development server running.
+For a configured OhMyGame Web preview, prefer `game_use`. Reuse its session, send real input, inspect runtime errors and failed asset loads, capture representative rendered states, and close the session in the same turn even after failure. For brief effects slow or freeze page time (`bridge setTimeScale`) or burst captures (`frames: 3-8`) before judging them; for layout changes run `sweep` for the per-viewport pass. OhMyGame owns the preview server; do not leave another development server running.
 
 For native engines, use available runtime tools, an engine Connection that actually supports launch or interaction, or project-owned automation. An editor MCP connection alone is not gameplay verification. Do not wrap a native game in a Web project merely to obtain screenshots. Do not install a new browser or automation framework solely for routine verification.
 
 Use an existing deterministic reset, seed, state snapshot, or step operation when it helps reach the affected state. Still verify real input and what the player sees. Add a minimal test-only bridge only when normal input cannot reliably reach or identify a necessary state; normal gameplay must not depend on it.
+
+## Physics And Motion Invariants
+
+Games with simulated motion — balls, projectiles, physics, drifting entities — need invariant soak tests in the project's logic suite, written when the mechanic is first implemented, not after a bug report. Run a long deterministic seeded simulation with rendering disabled and assert at frame granularity:
+
+- speeds stay inside the tuned range (no energy gain, no dead stalls);
+- motion never degenerates: entities keep the minimum forward or vertical component the design promises and never travel along a degenerate axis indefinitely;
+- entities stay inside the playfield;
+- entity counts respect their caps (projectiles, balls, spawned units);
+- positions and velocities remain finite.
+
+Per-action unit tests miss this class of bug: a wrong angle convention or a broken bounce clamp still clears targets and passes logic tests while the game plays broken. Asserting only the final state is not a soak test.
 
 ## Player-Facing Checks
 

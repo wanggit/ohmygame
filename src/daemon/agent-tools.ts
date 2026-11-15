@@ -665,7 +665,7 @@ export function createAgentTools(
           label: "Review Game Visuals",
           description: [
             "Independently review the game's visuals and image assets. It plays the game briefly through the preview runtime, captures gameplay screenshots (desktop and mobile), collects project image assets, and has a separate model judge them against a visual QA rubric.",
-            "Run it after the game builds and before telling the user the game is ready. Fix the player-facing issues it reports; its report is evidence, not a replacement for your own checks.",
+            "Run it after the game builds and before telling the user the game is ready. Fix the player-facing issues it reports; its report is evidence, not a replacement for your own checks. It samples the game briefly and does not cover every level — capture each level, stage, or distinct theme palette yourself before claiming visual verification.",
             "By default the project's language model reviews the images in a fresh context. Pass a different model to review with another model; it must accept images.",
           ].join("\n"),
           parameters: Type.Object({ model: Type.Optional(mediaModelParameter()) }, { additionalProperties: false }),

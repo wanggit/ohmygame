@@ -393,6 +393,7 @@ Extends `BaseTween`. Has all tween playback methods (`play`, `pause`, `resume`, 
 - **TweenManager.timeScale multiplies with Tween.timeScale.** The effective speed is `managerTimeScale * tweenTimeScale`. Setting either to 0 freezes the tween.
 - **Duration cannot be zero.** Internally clamped to a minimum of 0.01ms.
 - **TweenChain `targets` are inherited.** If you set `targets` at the chain level, individual tweens in the chain inherit them unless they specify their own.
+- **Absolute `scale` tweens fight `setDisplaySize`.** Sprites sized with `setDisplaySize(w, h)` still carry their original texture scale; a hit-feedback tween like `scale: { value: 1 }` snaps the display size back to the raw texture dimensions (a 256×256 brick suddenly covers its neighbors). Record the base scale when the sprite is created and tween around it (e.g. `scale: baseScale * 1.12 → baseScale`), and restore `tint` after hit-flash tweens.
 
 ## Source File Map
 
