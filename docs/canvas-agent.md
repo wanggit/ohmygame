@@ -169,11 +169,18 @@ variation, feel, audience) and **Skills and capabilities required** (the skills
 building the game needs and their availability: available, tool-producible,
 externally needed, or missing). `confirmMainDesign` rejects a document missing
 either section and reports which ones; heading matching accepts English and
-Chinese wording of these two questions.
+Chinese wording of these two questions. The confirmation also counts the
+visual mockups embedded in the document (`visualMockups`); agents should embed
+at least two (generated reference images or code-rendered stills) so the user
+confirms the visual direction together with the design, and the prompt context
+suggests adding more when the count is low.
 
 The confirmation is stored in `canvas/design-confirmation.json` and records the
-document ID and revision it confirmed. Editing the main design document changes
-its revision, which reopens the gate (`awaiting` with reason `stale`); the user
+document ID, revision, and section-heading fingerprint it confirmed. An edit
+that keeps every section heading intact refines the confirmed design and leaves
+the gate closed; adding, removing, or renaming a heading — or editing a document
+confirmed before fingerprinting existed — changes the revision anchor and
+reopens the gate (`awaiting` with reason `stale`); the user
 must confirm again before generation resumes. Projects without a main design
 document keep the gate closed (`no-main-document`), including when the canvas
 workspace cannot be read. `GET`/`POST /projects/:projectId/canvas/design-confirmation`

@@ -18,6 +18,7 @@ import {
 } from "../src/daemon/design-confirmation.js";
 import {
   DESIGN_CONFIRMATION_FILE,
+  countVisualMockups,
   designGateBlockReason,
   designGateState,
   isDesignConfirmationRecord,
@@ -61,6 +62,14 @@ describe("design gate state", () => {
   it("confirms only the recorded revision of the current main document", () => {
     expect(designGateState("web-game", main, record)).toEqual({ status: "confirmed", documentId: "design", revision: "rev-2", confirmedAt: record.confirmedAt });
   });
+  it("keeps the gate confirmed for content edits under unchanged headings and stales on structural edits", () => {
+    const structured = { ...record, structure: "## why players choose this game\n## skills and capabilities required" };
+    const refined = { documentId: "design", revision: "rev-3", structure: structured.structure };
+    expect(designGateState("web-game", refined, structured)).toEqual({ status: "confirmed", documentId: "design", revision: "rev-3", confirmedAt: structured.confirmedAt });
+    const restructured = { ...refined, structure: "## why players choose this game\n## skills and capabilities required\n## vfx requirements" };
+    expect(designGateState("web-game", restructured, structured)).toEqual({ status: "awaiting", documentId: "design", revision: "rev-3", reason: "stale" });
+    expect(designGateState("web-game", refined, record)).toEqual({ status: "awaiting", documentId: "design", revision: "rev-3", reason: "stale" });
+  });
   it("explains how to open the gate whenever it blocks a production tool", () => {
     expect(designGateBlockReason(designGateState("asset-canvas", main, record))).toBeUndefined();
     expect(designGateBlockReason(designGateState("web-game", main, record))).toBeUndefined();
@@ -76,6 +85,8 @@ describe("design gate state", () => {
     expect(isDesignConfirmationRecord({ ...record, version: 2 })).toBe(false);
     expect(isDesignConfirmationRecord({ ...record, documentId: "bad id!" })).toBe(false);
     expect(isDesignConfirmationRecord({ ...record, revision: "" })).toBe(false);
+    expect(isDesignConfirmationRecord({ ...record, structure: "## ok" })).toBe(true);
+    expect(isDesignConfirmationRecord({ ...record, structure: 7 })).toBe(false);
     expect(isDesignConfirmationRecord(null)).toBe(false);
   });
 });
@@ -97,6 +108,18 @@ describe("design required sections", () => {
     await store.save(project.id, { ...doc.document, markdown: REQUIRED_DESIGN_SECTIONS }, skipped.revision, doc.document.id);
     await expect(confirmMainDesign(project.workspacePath)).resolves.toMatchObject({ documentId: doc.document.id });
   });
+  it("counts embedded visual mockups at confirmation time", async () => {
+    const { project, store } = await runtime();
+    const doc = await store.createDocument(project.id, "Design");
+    const withMockups = `${REQUIRED_DESIGN_SECTIONS}\n\n![Title mock](assets/mock-title.png)\n\n![Gameplay mock](assets/mock-game.png)`;
+    const saved = await store.save(project.id, { ...doc.document, markdown: withMockups }, doc.revision, doc.document.id);
+    const record = await confirmMainDesign(project.workspacePath);
+    expect(record.visualMockups).toBe(2);
+    expect(countVisualMockups(withMockups)).toBe(2);
+    expect(countVisualMockups(REQUIRED_DESIGN_SECTIONS)).toBe(0);
+    expect(await designGateForProject(project.workspacePath, project.type)).toMatchObject({ status: "confirmed", visualMockups: 2 });
+    void saved;
+  });
 });
 
 describe("design confirmation files", () => {
@@ -110,9 +133,9 @@ describe("design confirmation files", () => {
     expect(main).toEqual({ documentId: doc.document.id, revision: answered.revision });
     expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "awaiting", ...main, reason: "missing" });
     const record = await confirmMainDesign(project.workspacePath);
-    expect(record).toMatchObject({ version: 1, documentId: doc.document.id, revision: answered.revision });
+    expect(record).toMatchObject({ version: 1, documentId: doc.document.id, revision: answered.revision, visualMockups: 0 });
     expect(await readDesignConfirmation(project.workspacePath)).toEqual(record);
-    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "confirmed", documentId: doc.document.id, revision: answered.revision, confirmedAt: record.confirmedAt });
+    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "confirmed", documentId: doc.document.id, revision: answered.revision, confirmedAt: record.confirmedAt, visualMockups: 0 });
     const saved = await store.save(project.id, { ...doc.document, markdown: "A tighter loop" }, answered.revision, doc.document.id);
     expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "awaiting", documentId: doc.document.id, revision: saved.revision, reason: "stale" });
     await removeDesignConfirmation(project.workspacePath);

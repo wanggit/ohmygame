@@ -3,8 +3,10 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import {
   DESIGN_CONFIRMATION_FILE,
+  countVisualMockups,
   designGateRequired,
   designGateState,
+  designStructure,
   isDesignConfirmationRecord,
   missingDesignSections,
   type DesignConfirmationRecord,
@@ -55,6 +57,8 @@ export async function confirmMainDesign(workspace: string): Promise<DesignConfir
     version: 1,
     documentId: main.documentId,
     revision: main.revision,
+    structure: designStructure(detail?.document.markdown ?? ""),
+    visualMockups: countVisualMockups(detail?.document.markdown ?? ""),
     confirmedAt: new Date().toISOString(),
   };
   await writeDesignConfirmation(workspace, record);
@@ -72,7 +76,8 @@ export async function designGateForProject(workspace: string, projectType: strin
   if (!designGateRequired(projectType)) return { status: "not-required" };
   try {
     const main = await mainDesignRevision(workspace);
-    return designGateState(projectType, main, await readDesignConfirmation(workspace));
+    const detail = main ? await readCanvasDocument(workspace, main.documentId) : undefined;
+    return designGateState(projectType, main && { ...main, structure: designStructure(detail?.document.markdown ?? "") }, await readDesignConfirmation(workspace));
   } catch {
     // An unreadable canvas workspace keeps the gate closed rather than silently allowing production.
     return { status: "no-main-document" };

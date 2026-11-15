@@ -2,13 +2,20 @@ import type { ProjectState, PromptContext } from "../shared/contracts.js";
 import { CANVAS_INDEX_FILE, canvasDocumentPath, type CanvasDocumentDetail } from "../shared/canvas-document.js";
 import { readCanvasDocuments, readCanvasIndex } from "./canvas-workspace.js";
 import { canvasBoardPath } from "../shared/canvas-workspace.js";
-import { designGateForProject } from "./design-confirmation.js";
+import { DESIGN_MOCKUP_GUIDELINE } from "../shared/design-confirmation.js";
+import { designGateForProject as resolveDesignGate } from "./design-confirmation.js";
 
 async function designGateLine(project: ProjectState): Promise<string | undefined> {
-  const gate = await designGateForProject(project.workspacePath, project.type);
+  const gate = await resolveDesignGate(project.workspacePath, project.type);
   if (gate.status === "not-required") return undefined;
-  if (gate.status === "confirmed") return `Design gate: the main design is user-confirmed (revision ${gate.revision.slice(0, 8)}). Media generation is allowed.`;
-  const wait = "Media generation tools are blocked until the user confirms the main design document. Discuss and finalize the core loop first, then tell the user the design is on the Design tab at the top of the workspace and ask them to confirm it (open the Design tab, select the main design document node, Confirm design).";
+  const mockupNote = ` Visual confirmation is part of the gate: embed at least ${DESIGN_MOCKUP_GUIDELINE} visual mockups (generated reference images or code-rendered stills) in the main design document so the user confirms the visual direction together with the design — prose alone invites "the art looks cheap / the layout is boring" rework after implementation.`;
+  if (gate.status === "confirmed") {
+    const confirmed = `Design gate: the main design is user-confirmed (revision ${gate.revision.slice(0, 8)}). Media generation is allowed.`;
+    return (gate.visualMockups ?? 0) >= DESIGN_MOCKUP_GUIDELINE
+      ? confirmed
+      : `${confirmed} The document embeds ${gate.visualMockups ?? 0} visual mockup(s); propose adding ${DESIGN_MOCKUP_GUIDELINE - (gate.visualMockups ?? 0)} more before heavy art production so the user can confirm look and layout early.`;
+  }
+  const wait = `Media generation tools are blocked until the user confirms the main design document. Discuss and finalize the core loop first${mockupNote} Then tell the user the design is on the Design tab at the top of the workspace and ask them to confirm it (open the Design tab, select the main design document node, Confirm design).`;
   if (gate.status === "awaiting") return `Design gate: the main design is ${gate.reason === "stale" ? "edited since the last user confirmation" : "not confirmed by the user yet"}. ${wait}`;
   return `Design gate: this project has no main design document yet. ${wait}`;
 }
