@@ -72,6 +72,17 @@ players and agent playtests attached to the old service are closed.
 Browser-only development retains its existing daemon address and reconnect
 behavior. It has no Electron supervisor or service-restart bridge.
 
+## Main window renderer recovery
+
+The main window supervises its own renderer. A gone renderer logs its reason
+and exit code and reloads the window at most twice in a rolling 60-second
+window, the same budget as automatic service restarts. Beyond that budget a
+dialog offers a manual reload or quitting the application; a manual reload
+restores the full budget. An unresponsive window offers to keep waiting or
+reload. State pushes to a disposed render frame are dropped silently, so a
+dead window never breaks playtest, preview, or update lifecycles, and agent
+playtest sessions open and close normally again after the window recovers.
+
 ## Validation scenarios
 
 - A Bun project under a desktop PATH without Bun returns a preview error while
@@ -93,6 +104,10 @@ behavior. It has no Electron supervisor or service-restart bridge.
   are rejected and never queued for automatic replay.
 - Only the project retained through recovery pauses its preview. Later projects
   start normally, plugin details load once, and loaded configuration drafts remain intact.
+- A crashed main window renderer reloads within the budget, then asks the
+  person; choosing reload restarts the budget and choosing quit shuts down
+  normally. Playtest watch pushes sent while the frame is gone are dropped
+  without failing the playtest request.
 
 Tests cover these behaviors in `preview.test.ts`, `preview-proxy.test.ts`,
 `daemon-supervisor.test.ts`, `runtime-recovery.test.tsx`, and related API tests.

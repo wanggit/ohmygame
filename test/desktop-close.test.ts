@@ -6,7 +6,7 @@ const host = vi.hoisted(() => ({
   ipcEvents: new Map<string, (...args: any[]) => void>(),
   handlers: new Map<string, (...args: any[]) => any>(),
   windowEvents: new Map<string, (...args: any[]) => void>(),
-  sender: { id: 1, send: vi.fn() },
+  sender: { id: 1, send: vi.fn(), on: vi.fn(), isDestroyed: () => false, reload: vi.fn() },
   thumbnails: [] as Array<{ webContents: { id: number }; destroy: ReturnType<typeof vi.fn> }>,
   stopped: vi.fn(async () => {}),
   quit: vi.fn(), relaunch: vi.fn(), close: vi.fn(),
@@ -83,7 +83,7 @@ beforeEach(async () => {
 afterEach(() => { process.argv.splice(process.argv.lastIndexOf("--built-renderer"), 1); vi.useRealTimers(); });
 
 const settle = async () => { await vi.advanceTimersByTimeAsync(0); };
-function acknowledge(error?: string, sender = host.sender, id?: number) {
+function acknowledge(error?: string, sender: { id: number; send: ReturnType<typeof vi.fn> } = host.sender, id?: number) {
   const sent = host.sender.send.mock.calls.findLast(([channel]) => channel === "ohmygame:prepare-close")!;
   host.ipcEvents.get("ohmygame:ready-to-close")!({ sender }, id ?? sent[1], error);
 }

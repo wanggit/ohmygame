@@ -20,6 +20,7 @@ import { DesktopUpdateCheckScheduler } from "./update-check-scheduler.js";
 import { ElectronPlaytestDriver } from "./playtest-driver.js";
 import { WebGamePlayerWindows, type WebGamePlayerTarget } from "./web-game-player.js";
 import { RendererCloseRequest } from "./renderer-close.js";
+import { RendererRecovery, sendToWindow } from "./renderer-recovery.js";
 import { AsyncTaskPool } from "./async-task-pool.js";
 import { isNodeGraph } from "../shared/playable-graph-validation.js";
 import { isCompiledNodeGraph } from "../shared/playable-compiled.js";
@@ -56,10 +57,10 @@ function handle(channel: string, listener: Parameters<typeof ipcMain.handle>[1])
   });
 }
 const agentPlaytests = new ElectronPlaytestDriver((state) => {
-  mainWindow?.webContents.send("ohmygame:agent-playtest-state", state);
+  sendToWindow(mainWindow, "ohmygame:agent-playtest-state", state);
 });
 const webGamePlayers = new WebGamePlayerWindows((state) => {
-  mainWindow?.webContents.send("ohmygame:web-game-player-state", state);
+  sendToWindow(mainWindow, "ohmygame:web-game-player-state", state);
 }, useBuiltRenderer
   ? pathToFileURL(path.join(moduleDirectory, "../renderer/web-game-host.html")).href
   : new URL("web-game-host.html", `${developmentRendererUrl}/`).href);
@@ -70,7 +71,7 @@ let rendererClose: RendererCloseRequest | undefined;
 let shutdown: Promise<void> | undefined;
 let updater: DesktopUpdater | undefined;
 let updateChecks: DesktopUpdateCheckScheduler | undefined;
-const oauth = new OAuthCallbackFlow(() => mainWindow?.webContents.send("ohmygame:auth-callback"));
+const oauth = new OAuthCallbackFlow(() => sendToWindow(mainWindow, "ohmygame:auth-callback"));
 const windowMenuLabels = new Set(["File", "Edit", "View", "Window"]);
 
 async function stopServices(): Promise<void> {
@@ -411,7 +412,7 @@ handle("ohmygame:open-playable-node", async (event, projectId: unknown, nodeId: 
   const playtest = await playtestWindows.get(projectId);
   if (!playtest || playtest.isDestroyed() || event.sender !== playtest.webContents) throw new Error("Invalid Node source");
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  mainWindow.webContents.send("ohmygame:open-playable-node", projectId, nodeId);
+  sendToWindow(mainWindow, "ohmygame:open-playable-node", projectId, nodeId);
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.focus();
 });
@@ -512,7 +513,7 @@ try {
         agentPlaytests.close();
       }
       for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.webContents.send("ohmygame:runtime-state", state);
+        sendToWindow(window, "ohmygame:runtime-state", state);
       }
     },
   });
@@ -520,7 +521,7 @@ try {
   updater = new DesktopUpdater(app.getVersion(), () => prepareShutdown(true));
 
   if (!useBuiltRenderer) await waitForRenderer(developmentRendererUrl);
-  updater.subscribe((state) => mainWindow?.webContents.send("ohmygame:update-state", state));
+  updater.subscribe((state) => sendToWindow(mainWindow, "ohmygame:update-state", state));
   await openMainWindow();
   if (app.isPackaged) {
     updateChecks = new DesktopUpdateCheckScheduler(updater);
@@ -546,6 +547,52 @@ async function openMainWindow(): Promise<void> {
     integratedMenuBar: true,
     beforeLoad: (window) => {
       mainWindow = window;
+      // A dead renderer leaves the window blank forever without these. Crashes
+      // reload within the same budget shape as daemon restarts; a crash loop
+      // stops and asks the person, who can reload or quit from the dialog.
+      const recovery = new RendererRecovery();
+      window.webContents.on("render-process-gone", (_event, details) => {
+        console.error(`Main window renderer gone (reason: ${details.reason}, exit code: ${details.exitCode})`);
+        if (quitting || window.isDestroyed()) return;
+        if (recovery.attempt()) {
+          window.webContents.reload();
+          return;
+        }
+        void dialog.showMessageBox(window, {
+          type: "error",
+          title: "OhMyGame",
+          message: "The window could not recover automatically.",
+          detail: "Reload the window to try again, or quit and reopen OhMyGame if reloading does not help.",
+          buttons: ["Reload", "Quit"],
+          defaultId: 0,
+          cancelId: 1,
+        }).then(({ response }) => {
+          if (quitting || window.isDestroyed()) return;
+          if (response === 0) {
+            recovery.reset();
+            window.webContents.reload();
+          } else {
+            app.quit();
+          }
+        });
+      });
+      let unresponsiveDialogOpen = false;
+      window.webContents.on("unresponsive", () => {
+        if (quitting || window.isDestroyed() || unresponsiveDialogOpen) return;
+        unresponsiveDialogOpen = true;
+        void dialog.showMessageBox(window, {
+          type: "warning",
+          title: "OhMyGame",
+          message: "The window is not responding.",
+          detail: "You can keep waiting, or reload the window if it stays stuck.",
+          buttons: ["Keep Waiting", "Reload"],
+          defaultId: 0,
+          cancelId: 0,
+        }).then(({ response }) => {
+          unresponsiveDialogOpen = false;
+          if (response === 1 && !quitting && !window.isDestroyed()) window.webContents.reload();
+        });
+      });
       window.on("show", () => {
         webGamePlayers.synchronize();
         updateChecks?.onFocus();
@@ -556,8 +603,8 @@ async function openMainWindow(): Promise<void> {
       window.on("restore", () => webGamePlayers.synchronize());
       window.on("resize", () => webGamePlayers.synchronize());
       const close = new RendererCloseRequest(
-        (id) => window.webContents.send("ohmygame:prepare-close", id),
-        (id, error) => { if (!window.isDestroyed()) window.webContents.send("ohmygame:cancel-close", id, error); },
+        (id) => sendToWindow(window, "ohmygame:prepare-close", id),
+        (id, error) => sendToWindow(window, "ohmygame:cancel-close", id, error),
       );
       rendererClose = close;
       let allowClose = false;
