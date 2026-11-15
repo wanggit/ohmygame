@@ -109,6 +109,11 @@ describe("agent error diagnostics", () => {
     expect(normalizeAgentError("Server failed (503): unavailable").code).toBe("provider_unavailable");
   });
 
+  it("classifies a connection drop wrapped in an HTTP 400 body as a transport failure, not a rejection", () => {
+    // Real gateway failure from the 2026-11-15 Prism Echo session.
+    expect(normalizeAgentError('400: {"code":"400","message":"Request failed","param":"Connection prematurely closed BEFORE response","type":""}', { statusCode: 400, errorCode: "400" }).code).toBe("connection_reset");
+  });
+
   it("handles a thrown SDK object directly without converting it to an assistant message", () => {
     expect(thrownAgentError({ message: "Authentication failed", status: 401 })).toMatchObject({ message: "Authentication failed", code: "authentication_failed" });
     const unreadable = new Error();

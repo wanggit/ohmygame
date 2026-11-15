@@ -320,7 +320,7 @@ diff --git a/dist/utils/retry.js b/dist/utils/retry.js
 index d1da13a..23e8005 100644
 --- a/dist/utils/retry.js
 +++ b/dist/utils/retry.js
-@@ -193,8 +193,26 @@ export async function retryAssistantCall(produce, policy, signal, callbacks) {
+@@ -193,8 +193,31 @@ export async function retryAssistantCall(produce, policy, signal, callbacks) {
  export function isRetryableAssistantError(message) {
      if (message.stopReason !== "error" || !message.errorMessage)
          return false;
@@ -336,6 +336,11 @@ index d1da13a..23e8005 100644
          return false;
 -    return RETRYABLE_PROVIDER_ERROR_PATTERN.test(errorMessage);
 +    if (RETRYABLE_PROVIDER_ERROR_PATTERN.test(errorMessage))
++        return true;
++    // A gateway can wrap a transport-level connection drop in a non-2xx body
++    // (e.g. HTTP 400 with "Connection prematurely closed BEFORE response"). That
++    // wording is a transient network failure, not an authoritative rejection.
++    if (/prematurely closed/i.test(errorMessage))
 +        return true;
 +    // Gateways can wrap an upstream failure in an HTTP 2xx response and report the
 +    // real failure only in the body (for example HTTP 200 carrying error code 400

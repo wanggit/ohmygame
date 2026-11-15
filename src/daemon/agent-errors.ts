@@ -81,6 +81,11 @@ export function thrownAgentError(cause: unknown): ThreadItemError {
 
 function classifyAgentError(message: string, diagnostics: AgentErrorDiagnostics): ThreadItemErrorCode | undefined {
   const text = `${diagnostics.errorCode ?? ""} ${message}`;
+  // A gateway can wrap a transport-level connection drop in a 4xx body (for
+  // example HTTP 400 with "Connection prematurely closed BEFORE response").
+  // Classify by the real cause so a transient network drop does not present
+  // as an authoritative request rejection.
+  if (/\bprematurely closed\b/i.test(text)) return "connection_reset";
   const legacyStatus = message.match(/^(?:([45]\d\d)(?::|\s)|[^()\n]*\(([45]\d\d)\)\s*:)/);
   const httpStatus = diagnostics.statusCode ?? Number(legacyStatus?.[1] ?? legacyStatus?.[2]);
   // Gateways can wrap the real failure in an HTTP 2xx response and report it as a

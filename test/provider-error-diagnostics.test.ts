@@ -86,6 +86,18 @@ describe("patched Pi provider failures", () => {
     expect(assistantMessageError(message)).toMatchObject({ code: "invalid_request", diagnostics: { statusCode: 400 } });
   });
 
+  it("retries a connection drop wrapped in an HTTP 400 body and classifies it as a transport failure", async () => {
+    // Real gateway failure from the 2026-11-15 Prism Echo session: HTTP 400 whose
+    // body reports the upstream connection closed before any response.
+    const message = await completions(model, context, { apiKey: "test-only", maxRetries: 0, fetch: async () => new Response(
+      JSON.stringify({ error: { code: "400", message: "Request failed", param: "Connection prematurely closed BEFORE response", type: "" } }),
+      { status: 400, headers: { "content-type": "application/json" } },
+    ) }).result();
+    expect(message.errorMessage).toContain("prematurely closed");
+    expect(isRetryableAssistantError(message)).toBe(true);
+    expect(assistantMessageError(message)).toMatchObject({ code: "connection_reset", diagnostics: { statusCode: 400 } });
+  });
+
   it("also preserves connection causes in the Responses adapter", async () => {
     const responseModel = { ...model, api: "openai-responses" as const, provider: "openai", baseUrl: "https://example.invalid/v1" };
     const message = await responses(responseModel, context, { apiKey: "test-only", fetch: async () => { throw Object.assign(new Error("connection refused"), { code: "ECONNREFUSED" }); } }).result();

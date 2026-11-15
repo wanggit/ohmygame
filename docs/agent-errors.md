@@ -60,7 +60,10 @@ words such as a parameter named `timeout` cannot make these errors retryable.
 A failure wrapped in an HTTP 2xx response whose body carries the real rejection
 (for example HTTP 200 with error code 400) is treated as a transient
 gateway/upstream condition and stays retryable; authoritative non-2xx rejections
-keep the wording rules and stay non-retryable.
+keep the wording rules and stay non-retryable. Exception: a gateway that wraps a
+transport-level connection drop in a non-2xx body (for example HTTP 400 with
+"Connection prematurely closed BEFORE response") is classified by the real cause
+— `connection_reset`, retryable — instead of presenting as a request rejection.
 Context-compaction errors and third-party adapters
 can still return only a message; those failures use the available message as a
 fallback.
@@ -93,7 +96,9 @@ failure diagnostic helper and adapter hooks over a permanent fork.
 Every Pi upgrade must also recheck the WebSocket retry classifier: authoritative
 authentication, quota and invalid-request failures remain non-retryable, ordinary
 429 rate limits and transient provider failures remain retryable, HTTP 2xx
-wrapped body rejections remain retryable, and context overflow still enters
+wrapped body rejections remain retryable, transport drops wrapped in non-2xx
+bodies (e.g. HTTP 400 "Connection prematurely closed BEFORE response") remain
+retryable and classified as `connection_reset`, and context overflow still enters
 compaction. Keep these checks after a clean dependency install.
 
 Run `test/provider-error-diagnostics.test.ts` to exercise real Pi adapters with
