@@ -287,15 +287,23 @@ tool `game_use`. This is an OhMyGame core capability rather than a Plugin:
    coordinates, and returned to the model as JPEG image content. Every later
    request resends them, so they stay small.
 
-The tool supports `open`, `inspect`, `act`, `capture`, and `close`. Runtime
-adapters receive a typed open target; the Web adapter uses a Preview URL while
-other adapters can use their project or process identity. Actions
+The tool supports `open`, `inspect`, `act`, `capture`, `sweep`, and `close`.
+Runtime adapters receive a typed open target; the Web adapter uses a Preview URL
+while other adapters can use their project or process identity. Actions
 cover semantic or coordinate clicks, text input, instant or held key presses,
 touch, bounded waits, viewport resizing, and the optional game bridge below.
+`bridge setTimeScale` is driver-level page time control (0 freezes, 0.05-0.5
+slows, 1 restores) for screenshotting brief effects, and `capture` accepts
+`frames`/`intervalMs` to burst several screenshots back to back. `sweep`
+resizes through representative viewports (375x667, 768x1024, 1280x720),
+screenshots each, flags blank frames, horizontal overflow, console errors and
+failed requests, and restores the original viewport.
 Calls are sequential, abort with the Agent turn, and time out after 30 seconds.
 Sessions are destroyed when explicitly closed, when the daemon or Electron app
-shuts down, or after an open failure. At most four sessions may remain open at
-once, which bounds hidden-window resource use if an Agent misses cleanup.
+shuts down, or after an open failure. Reopening the same URL reloads the
+matching session instead of opening another window. At most eight sessions may
+remain open at once; opening a ninth closes the least recently used one, which
+bounds hidden-window resource use if an Agent misses cleanup.
 
 The Preview toolbar can reveal the same isolated windows in a watch mode. These
 are independent, movable, resizable native windows with the normal macOS title

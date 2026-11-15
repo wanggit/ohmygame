@@ -8,6 +8,7 @@ import type {
   GameUseSnapshot,
   PlaytestAction,
   PlaytestSnapshot,
+  PlaytestViewport,
 } from "../shared/playtest.js";
 
 const viewportSchema = Type.Object({
@@ -40,7 +41,17 @@ const semanticTargetSchema = Type.Union([
 ]);
 
 const resetBridgeAction = Type.Object({ type: Type.Literal("bridge"), method: Type.Literal("reset") }, { additionalProperties: false });
-const valueBridgeAction = Type.Object({ type: Type.Literal("bridge"), method: Type.Union([Type.Literal("setSeed"), Type.Literal("step")]), value: Type.Number() }, { additionalProperties: false });
+const valueBridgeAction = Type.Object({
+  type: Type.Literal("bridge"),
+  method: Type.Union([Type.Literal("setSeed"), Type.Literal("step")]),
+  value: Type.Number(),
+}, { additionalProperties: false });
+/** Driver-level page time control; not part of any game bridge, so every runtime may offer it. */
+const timeScaleAction = Type.Object({
+  type: Type.Literal("bridge"),
+  method: Type.Literal("setTimeScale"),
+  value: Type.Number({ minimum: 0, maximum: 4, description: "Page time scale: 0 freezes the page clock, 0.05-0.5 slows it down for inspecting brief effects, 1 restores real time" }),
+}, { additionalProperties: false });
 
 const inputActions = [
   Type.Object({ type: Type.Literal("click"), target: targetSchema }, { additionalProperties: false }),
@@ -55,15 +66,16 @@ const inputActions = [
   Type.Object({ type: Type.Literal("resize"), viewport: viewportSchema }, { additionalProperties: false }),
 ] as const;
 
-const actionSchema = Type.Union([...inputActions, resetBridgeAction, valueBridgeAction]);
+const actionSchema = Type.Union([...inputActions, resetBridgeAction, valueBridgeAction, timeScaleAction]);
 
 const parameters = gameUseParameters(actionSchema);
 
 /**
  * The Playable Nodes player's bridge only resets, so its agent is not offered
- * setSeed or step; a web game may implement all of them.
+ * setSeed or step; a web game may implement all of them. Driver-level time
+ * control stays available either way.
  */
-const resetOnlyParameters = gameUseParameters(Type.Union([...inputActions, resetBridgeAction])) as unknown as typeof parameters;
+const resetOnlyParameters = gameUseParameters(Type.Union([...inputActions, resetBridgeAction, timeScaleAction])) as unknown as typeof parameters;
 
 function gameUseParameters<Action extends TSchema>(action: Action) {
   return Type.Object({
@@ -72,12 +84,16 @@ function gameUseParameters<Action extends TSchema>(action: Action) {
       Type.Literal("inspect"),
       Type.Literal("act"),
       Type.Literal("capture"),
+      Type.Literal("sweep"),
       Type.Literal("close"),
     ]),
     path: Type.Optional(Type.String({ maxLength: 1_000, description: "Path, query, or hash within a web game target; used only by open" })),
     viewport: Type.Optional(viewportSchema),
-    sessionId: Type.Optional(Type.String({ minLength: 1, maxLength: 100, description: "Session returned by open; required for inspect, act, capture, and close" })),
+    sessionId: Type.Optional(Type.String({ minLength: 1, maxLength: 100, description: "Session returned by open; required for inspect, act, capture, sweep, and close" })),
     actions: Type.Optional(Type.Array(action, { minItems: 1, maxItems: 20, description: "Actions to run; required for act" })),
+    frames: Type.Optional(Type.Integer({ minimum: 1, maximum: 8, description: "capture only: burst this many screenshots back to back to catch brief effects; the default 1 takes a single shot" })),
+    intervalMs: Type.Optional(Type.Integer({ minimum: 40, maximum: 2_000, description: "capture only: gap between burst frames, default 120" })),
+    viewports: Type.Optional(Type.Array(viewportSchema, { minItems: 1, maxItems: 4, description: "sweep only: viewport sizes to check; defaults to 375x667, 768x1024 and 1280x720" })),
   }, { additionalProperties: false });
 }
 
@@ -89,12 +105,14 @@ export function createGameUseTool(
   return defineTool<typeof parameters, unknown>({
     name: "game_use",
     label: "Game Use",
-    description: "Use the current game runtime as a player: open and control the game, inspect interactive elements and canvas state, capture screenshots, review console and network failures, and call an optional deterministic game bridge. Open and act return a fresh state snapshot. Reuse the returned sessionId and close the session when finished.",
+    description: "Use the current game runtime as a player: open and control the game, inspect interactive elements and canvas state, capture screenshots, review console and network failures, and call an optional deterministic game bridge. Open and act return a fresh state snapshot. Reuse the returned sessionId and close the session when finished. Reopening the same project route reloads the existing session. For brief effects (explosions, flashes, ultimates) use the setTimeScale action to slow or freeze page time before capturing, and capture with frames>1 to burst screenshots. Use sweep for one-call responsive verification across representative viewports.",
     promptSnippet: "Use the current game with real player input, runtime inspection, and screenshots",
     promptGuidelines: [
       "Use game_use for game runtime or visual verification; a successful build alone is not a playtest",
       "Batch adjacent input and wait steps into one act call; open and act already return fresh state, so inspect only when a separate refresh is needed",
       "Capture screenshots for Canvas or WebGL verification and close playtest sessions when finished",
+      "Transient effects: act with bridge setTimeScale (0 freezes the clock, 0.2 slows it) right before capture, or capture with frames 3-8 — a single screenshot often misses short-lived effects and a missed frame is not evidence that the effect is broken",
+      "Run sweep after layout-affecting changes: it checks 375x667, 768x1024 and 1280x720 with screenshots and flags blank frames, horizontal overflow, console errors and failed requests",
     ],
     parameters: bridge === "reset" ? resetOnlyParameters : parameters,
     executionMode: "sequential",
@@ -119,20 +137,34 @@ export function createGameUseTool(
       }
       if (input.operation === "capture") {
         requireCapability(driver, "screenshot", "observation");
-        const result = await driver.request({ operation: "capture", sessionId: requiredSessionId(input.operation, input.sessionId) }, signal);
+        const frames = input.frames ?? 1;
+        const result = await driver.request({
+          operation: "capture",
+          sessionId: requiredSessionId(input.operation, input.sessionId),
+          ...(frames > 1 ? { frames, ...(input.intervalMs ? { intervalMs: input.intervalMs } : {}) } : {}),
+        }, signal);
         if (result.operation !== "capture") throw new Error("Unexpected game use response");
+        const captures = result.captures ?? [result.capture];
         return {
           content: [
             { type: "text", text: JSON.stringify({
               sessionId: result.capture.sessionId,
-              width: result.capture.width,
-              height: result.capture.height,
-              analysis: result.capture.analysis,
+              frames: captures.map((frame, index) => ({
+                frame: index,
+                width: frame.width,
+                height: frame.height,
+                analysis: frame.analysis,
+              })),
             }, null, 2) },
-            { type: "image", data: result.capture.data, mimeType: result.capture.mediaType },
+            ...captures.map((frame) => ({ type: "image" as const, data: frame.data, mimeType: frame.mediaType })),
           ],
           details: { playtestCapture: { ...result.capture, data: undefined } },
         };
+      }
+      if (input.operation === "sweep") {
+        requireCapability(driver, "screenshot", "observation");
+        requireCapability(driver, "resize", "input");
+        return sweepViewports(driver, requiredSessionId(input.operation, input.sessionId), input.viewports, signal);
       }
       if (input.operation === "close") {
         const sessionId = requiredSessionId(input.operation, input.sessionId);
@@ -154,6 +186,70 @@ function requiredSessionId(operation: string, sessionId?: string): string {
   return sessionId;
 }
 
+const DEFAULT_SWEEP_VIEWPORTS: readonly PlaytestViewport[] = [
+  { width: 375, height: 667 },
+  { width: 768, height: 1024 },
+  { width: 1280, height: 720 },
+];
+
+/**
+ * One-call responsive verification: resize through representative viewports,
+ * screenshot each, flag blank frames, horizontal overflow and console errors,
+ * then restore the original viewport. Covers the per-viewport screenshot pass
+ * that visual QA otherwise forgets.
+ */
+async function sweepViewports(
+  driver: GameRuntimeAdapter,
+  sessionId: string,
+  viewports: PlaytestViewport[] | undefined,
+  signal?: AbortSignal,
+) {
+  const sizes = viewports ?? [...DEFAULT_SWEEP_VIEWPORTS];
+  const before = await driver.request({ operation: "inspect", sessionId }, signal);
+  if (before.operation !== "inspect") throw new Error("Unexpected game use response");
+  const original = before.snapshot.viewport;
+  const results: Array<Record<string, unknown>> = [];
+  const images: Array<{ type: "image"; data: string; mimeType: string }> = [];
+  const issues: string[] = [];
+  try {
+    for (const viewport of sizes) {
+      signal?.throwIfAborted();
+      const resized = await driver.request({ operation: "act", sessionId, actions: [{ type: "resize", viewport }] }, signal);
+      if (resized.operation !== "act") throw new Error("Unexpected game use response");
+      const shot = await driver.request({ operation: "capture", sessionId }, signal);
+      if (shot.operation !== "capture") throw new Error("Unexpected game use response");
+      const snapshot = resized.snapshot;
+      const label = `${viewport.width}x${viewport.height}`;
+      const consoleErrors = isPlaytestSnapshot(snapshot) ? snapshot.logs.filter((log) => log.level === "error").length : 0;
+      const failedRequests = isPlaytestSnapshot(snapshot) ? snapshot.failedRequests.length : 0;
+      const overflowX = isPlaytestSnapshot(snapshot) ? snapshot.overflowX === true : false;
+      const likelyBlank = shot.capture.analysis.likelyBlank;
+      if (likelyBlank) issues.push(`${label}: captured frame looks blank`);
+      if (overflowX) issues.push(`${label}: page overflows horizontally (scrollWidth > viewport)`);
+      if (consoleErrors > 0) issues.push(`${label}: ${consoleErrors} console error(s) in session log`);
+      if (failedRequests > 0) issues.push(`${label}: ${failedRequests} failed request(s) in session log`);
+      results.push({
+        viewport,
+        likelyBlank,
+        overflowX,
+        consoleErrors,
+        failedRequests,
+        luminanceMean: shot.capture.analysis.luminanceMean,
+      });
+      images.push({ type: "image", data: shot.capture.data, mimeType: shot.capture.mediaType });
+    }
+  } finally {
+    await driver.request({ operation: "act", sessionId, actions: [{ type: "resize", viewport: original }] }, signal).catch(() => undefined);
+  }
+  return {
+    content: [
+      { type: "text" as const, text: JSON.stringify({ sessionId, originalViewport: original, results, issues }, null, 2) },
+      ...images,
+    ],
+    details: { playtestSweep: { sessionId, originalViewport: original, results, issues } },
+  };
+}
+
 function requiredActions(actions?: PlaytestAction[]): PlaytestAction[] {
   if (!actions?.length) throw new Error("actions are required for act");
   return actions;
@@ -173,6 +269,9 @@ function withOpenPath(target: GameUseOpenTarget, path: string): GameUseOpenTarge
 
 function supportedActions(driver: GameRuntimeAdapter, actions: PlaytestAction[]): PlaytestAction[] {
   for (const action of actions) {
+    if (action.type === "bridge" && action.method === "setTimeScale" && !driver.capabilities.timeControl) {
+      throw new Error("Game runtime does not support time control (setTimeScale)");
+    }
     const required = actionCapabilities(action);
     const missingInput = required.input.filter((capability) => !driver.capabilities.input.includes(capability));
     if (missingInput.length > 0) throw new Error(`Game runtime does not support ${missingInput.join(" and ")} input for ${action.type}`);

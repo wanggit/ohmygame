@@ -20,6 +20,10 @@ import {
 interface PlaytestSession {
   id: string;
   origin: string;
+  /** Full navigation URL (including the playtest marker). Reopening the same URL reuses the session. */
+  url: string;
+  /** Epoch ms of the last request on this session; used to evict the stalest session at capacity. */
+  lastActivity: number;
   window: BrowserWindow;
   ready: boolean;
   logs: PlaytestLog[];
@@ -40,13 +44,15 @@ type FrameElements = Pick<PlaytestSnapshot, "elements"> & { text: string };
 
 const MAX_LOGS = 100;
 const MAX_FAILED_REQUESTS = 100;
-const MAX_SESSIONS = 4;
+const MAX_SESSIONS = 8;
 /** Sessions the agent leaves open are closed after this long without a request. */
 const IDLE_TIMEOUT_MS = 10 * 60_000;
 const MAX_ELEMENTS = 100;
 const MAX_TEXT = 4_000;
 /** Screenshots are resent with every later model request, so keep them small. */
 const CAPTURE_JPEG_QUALITY = 80;
+/** Default gap between burst-capture frames, tuned to catch short-lived effects. */
+const DEFAULT_BURST_INTERVAL_MS = 120;
 
 export class ElectronPlaytestDriver implements GameRuntimeAdapter {
   readonly available = true;
@@ -83,7 +89,16 @@ export class ElectronPlaytestDriver implements GameRuntimeAdapter {
       case "open": return { operation: "open", snapshot: await this.#open(request.target, request.viewport, signal) };
       case "inspect": return { operation: "inspect", snapshot: await this.#inspect(this.#activeSession(request.sessionId), signal) };
       case "act": return { operation: "act", snapshot: await this.#act(this.#activeSession(request.sessionId), request.actions, signal) };
-      case "capture": return { operation: "capture", capture: await this.#capture(this.#activeSession(request.sessionId), signal) };
+      case "capture": {
+        const frames = request.frames ?? 1;
+        const intervalMs = request.intervalMs ?? DEFAULT_BURST_INTERVAL_MS;
+        if (!Number.isInteger(frames) || frames < 1 || frames > 8) throw new Error("Playtest capture frames must be an integer between 1 and 8");
+        if (!Number.isInteger(intervalMs) || intervalMs < 40 || intervalMs > 2_000) throw new Error("Playtest capture interval must be an integer between 40 and 2000ms");
+        const state = this.#activeSession(request.sessionId);
+        if (frames === 1) return { operation: "capture", capture: await this.#capture(state, signal) };
+        const captures = await this.#captureBurst(state, frames, intervalMs, signal);
+        return { operation: "capture", capture: captures[0]!, captures };
+      }
       case "close":
         this.#close(request.sessionId);
         return { operation: "close" };
@@ -101,10 +116,13 @@ export class ElectronPlaytestDriver implements GameRuntimeAdapter {
     if (target.runtime !== "web") throw new Error(`Electron game use does not support the ${target.runtime} runtime`);
     const url = validatedPlaytestUrl(target.url);
     validateViewport(viewport);
-    if (this.#sessions.size >= MAX_SESSIONS) {
-      throw new Error(`Close an existing game session before opening more than ${MAX_SESSIONS}`);
-    }
     url.searchParams.set("ohmygamePlaytest", "1");
+    // Reopening the same URL reloads the existing session instead of opening
+    // another window, so repeated open → drive → capture loops never exhaust
+    // session slots and keep a stable sessionId across code rebuilds.
+    const existing = [...this.#sessions.values()].find((session) => session.url === url.href && !session.window.isDestroyed());
+    if (existing) return this.#reopen(existing, viewport, signal);
+    if (this.#sessions.size >= MAX_SESSIONS) this.#evictStalest();
     const id = randomUUID();
     const window = new BrowserWindow({
       width: viewport.width,
@@ -127,7 +145,7 @@ export class ElectronPlaytestDriver implements GameRuntimeAdapter {
         partition: `ohmygame-playtest-${id}`,
       },
     });
-    const state: PlaytestSession = { id, origin: url.origin, window, ready: false, logs: [], failedRequests: [] };
+    const state: PlaytestSession = { id, origin: url.origin, url: url.href, lastActivity: Date.now(), window, ready: false, logs: [], failedRequests: [] };
     this.#sessions.set(id, state);
     this.#resetIdleTimer(state);
     this.#publishWatchState();
@@ -194,6 +212,41 @@ export class ElectronPlaytestDriver implements GameRuntimeAdapter {
       this.#close(id);
       throw cause;
     }
+  }
+
+  /**
+   * Reload an existing session's page (picking up rebuilt code) and adjust its
+   * viewport. The sessionId, window and debugger attachment all survive, so the
+   * agent can keep driving with the id it already knows.
+   */
+  async #reopen(state: PlaytestSession, viewport: PlaytestViewport, signal?: AbortSignal): Promise<PlaytestSnapshot> {
+    this.#assertLive(state);
+    validateViewport(viewport);
+    state.window.setContentSize(viewport.width, viewport.height);
+    state.logs = [];
+    state.failedRequests = [];
+    state.ready = false;
+    this.#touch(state);
+    try {
+      await state.window.loadURL(state.url);
+      signal?.throwIfAborted();
+      state.ready = true;
+      return await this.#inspect(state, signal);
+    } catch (cause) {
+      this.#close(state.id);
+      throw cause;
+    }
+  }
+
+  /** Close the least recently used session to make room for a new one. */
+  #evictStalest(): void {
+    const stalest = [...this.#sessions.values()].sort((a, b) => a.lastActivity - b.lastActivity)[0];
+    if (stalest) this.#close(stalest.id);
+  }
+
+  #touch(state: PlaytestSession): void {
+    state.lastActivity = Date.now();
+    this.#resetIdleTimer(state);
   }
 
   async #inspect(state: PlaytestSession, signal?: AbortSignal): Promise<PlaytestSnapshot> {
@@ -292,6 +345,14 @@ export class ElectronPlaytestDriver implements GameRuntimeAdapter {
         await abortableDelay(100, signal);
         return;
       case "bridge": {
+        if (action.method === "setTimeScale") {
+          if (!Number.isFinite(action.value) || action.value < 0 || action.value > 4) {
+            throw new Error("Playtest time scale must be a number between 0 (frozen) and 4");
+          }
+          await state.window.webContents.executeJavaScript(`(${TIME_SCALE_SCRIPT})(${action.value})`, true);
+          await abortableDelay(50, signal);
+          return;
+        }
         const value = "value" in action ? action.value : undefined;
         const result = await state.window.webContents.executeJavaScript(`(${BRIDGE_ACTION_SCRIPT})(${JSON.stringify(action.method)}, ${JSON.stringify(value)})`, true);
         if (result !== true) throw new Error(`The game playtest bridge does not support ${action.method}`);
@@ -350,6 +411,16 @@ export class ElectronPlaytestDriver implements GameRuntimeAdapter {
     };
   }
 
+  /** Several captures back to back, for effects too brief for a single screenshot. */
+  async #captureBurst(state: PlaytestSession, frames: number, intervalMs: number, signal?: AbortSignal): Promise<PlaytestCapture[]> {
+    const captures: PlaytestCapture[] = [];
+    for (let frame = 0; frame < frames; frame++) {
+      if (frame > 0) await abortableDelay(intervalMs, signal);
+      captures.push(await this.#capture(state, signal));
+    }
+    return captures;
+  }
+
   #session(id: string): PlaytestSession {
     const state = this.#sessions.get(id);
     if (!state) throw new Error(`Game session not found: ${id}`);
@@ -358,7 +429,7 @@ export class ElectronPlaytestDriver implements GameRuntimeAdapter {
 
   #activeSession(id: string): PlaytestSession {
     const state = this.#session(id);
-    this.#resetIdleTimer(state);
+    this.#touch(state);
     return state;
   }
 
@@ -389,7 +460,14 @@ export class ElectronPlaytestDriver implements GameRuntimeAdapter {
 
   #publishWatchState(): PlaytestWatchState {
     const state = this.watchState();
-    this.onWatchStateChange?.(state);
+    // The main render frame can be gone (renderer crash or reload) while a
+    // session opens or closes. A failed push must not abort that lifecycle
+    // work, or every later game-use request keeps failing with it.
+    try {
+      this.onWatchStateChange?.(state);
+    } catch {
+      // Best-effort; the window publishes fresh state after it recovers.
+    }
     return state;
   }
 }
@@ -599,6 +677,40 @@ const BRIDGE_ACTION_SCRIPT = `async (method, value) => {
   return true;
 }`;
 
+/**
+ * Page time control for transient-effect inspection. Scales the clocks games
+ * usually read (rAF timestamps, performance.now, Date.now) so the page can be
+ * slowed or frozen without any game-side support. Idempotent: the first call
+ * installs the shim, every call updates the scale. Freezing keeps rendering and
+ * rAF callbacks alive (with a constant clock) so frozen frames stay capturable.
+ */
+const TIME_SCALE_SCRIPT = `(scale) => {
+  const shim = globalThis.__OHMYGAME_TIME_SCALE__;
+  if (shim) { shim.setScale(scale); return true; }
+  const realPerfNow = performance.now.bind(performance);
+  const realDateNow = Date.now.bind(Date);
+  let anchorReal = realPerfNow();
+  let anchorVirtual = anchorReal;
+  const baseDate = realDateNow() - anchorVirtual;
+  let rate = scale;
+  const virtualNow = () => anchorVirtual + (realPerfNow() - anchorReal) * rate;
+  const setScale = (next) => {
+    anchorVirtual = virtualNow();
+    anchorReal = realPerfNow();
+    rate = next;
+  };
+  try {
+    performance.now = () => virtualNow();
+    Date.now = () => Math.round(baseDate + virtualNow());
+    const originalRequest = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (callback) => originalRequest(() => callback(virtualNow()));
+  } catch {
+    return false;
+  }
+  globalThis.__OHMYGAME_TIME_SCALE__ = { setScale, get scale() { return rate; } };
+  return true;
+}`;
+
 /** Where each iframe's content is drawn, including any CSS scale. */
 const IFRAME_BOXES_SCRIPT = `(() => { ${TARGET_HELPERS}
   return deepQueryAll("iframe").map((frame) => {
@@ -644,6 +756,7 @@ const PAGE_INSPECTION_SCRIPT = `(async () => { ${TARGET_HELPERS}
     elements,
     canvases,
     ...(text ? { text } : {}),
+    overflowX: document.documentElement.scrollWidth > innerWidth + 1,
     ...(gameState !== undefined ? { gameState } : {}),
     ...(capabilities.length ? { bridgeCapabilities: capabilities } : {}),
   };

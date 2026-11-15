@@ -18,6 +18,8 @@ export interface GameUseCapabilities {
   observation: readonly GameUseObservationCapability[];
   deterministic: readonly GameUseDeterminismCapability[];
   watch: boolean;
+  /** The driver can scale page time (slow motion / freeze) without game-side support. */
+  timeControl: boolean;
 }
 
 export const WEB_GAME_USE_CAPABILITIES: GameUseCapabilities = {
@@ -27,6 +29,7 @@ export const WEB_GAME_USE_CAPABILITIES: GameUseCapabilities = {
   observation: ["screenshot", "dom", "canvas", "console", "network"],
   deterministic: [],
   watch: true,
+  timeControl: true,
 };
 
 export type GameUseOpenTarget =
@@ -48,7 +51,14 @@ export type PlaytestAction =
   | { type: "wait"; milliseconds: number }
   | { type: "resize"; viewport: PlaytestViewport }
   | { type: "bridge"; method: "reset" }
-  | { type: "bridge"; method: "setSeed" | "step"; value: number };
+  | { type: "bridge"; method: "setSeed" | "step"; value: number }
+  /**
+   * Driver-level page time scale: 0 freezes the page clock (frame-by-frame
+   * inspection of transient effects), values in (0, 1) slow it down, 1 restores
+   * real time. Applies to rAF/performance.now/Date.now regardless of any game
+   * playtest bridge, so effects too brief to screenshot become capturable.
+   */
+  | { type: "bridge"; method: "setTimeScale"; value: number };
 
 export interface PlaytestElement {
   index: number;
@@ -100,6 +110,8 @@ export interface PlaytestSnapshot extends GameUseSnapshot {
   canvases: PlaytestCanvas[];
   /** Visible text of the page and its frames, truncated. */
   text?: string;
+  /** The document scrolls horizontally beyond the viewport (layout overflow). */
+  overflowX?: boolean;
   logs: PlaytestLog[];
   failedRequests: PlaytestFailedRequest[];
 }
@@ -128,7 +140,11 @@ export type PlaytestRequest =
   | { operation: "open"; target: GameUseOpenTarget; viewport: PlaytestViewport }
   | { operation: "inspect"; sessionId: string }
   | { operation: "act"; sessionId: string; actions: PlaytestAction[] }
-  | { operation: "capture"; sessionId: string }
+  /**
+   * `frames` > 1 bursts several screenshots back to back (default interval 120ms),
+   * which catches transient effects that a single capture misses.
+   */
+  | { operation: "capture"; sessionId: string; frames?: number; intervalMs?: number }
   | { operation: "close"; sessionId: string }
   | { operation: "closeAll" };
 
@@ -136,7 +152,7 @@ export type PlaytestResult =
   | { operation: "open"; snapshot: GameUseSnapshot }
   | { operation: "inspect"; snapshot: GameUseSnapshot }
   | { operation: "act"; snapshot: GameUseSnapshot }
-  | { operation: "capture"; capture: PlaytestCapture }
+  | { operation: "capture"; capture: PlaytestCapture; captures?: PlaytestCapture[] }
   | { operation: "close" | "closeAll" };
 
 export interface GameRuntimeAdapter {

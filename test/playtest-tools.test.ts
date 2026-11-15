@@ -31,16 +31,19 @@ class FakeDriver implements GameRuntimeAdapter {
   async request(request: PlaytestRequest): Promise<PlaytestResult> {
     this.requests.push(request);
     if (request.operation === "capture") {
+      const frame = {
+        sessionId: request.sessionId,
+        mediaType: "image/jpeg" as const,
+        data: Buffer.from("jpeg").toString("base64"),
+        width: 1280,
+        height: 720,
+        analysis: { sampledPixels: 100, opaqueRatio: 1, luminanceMean: 80, luminanceVariance: 12, likelyBlank: false },
+      };
+      const frames = request.frames ?? 1;
       return {
         operation: "capture",
-        capture: {
-          sessionId: request.sessionId,
-          mediaType: "image/jpeg",
-          data: Buffer.from("jpeg").toString("base64"),
-          width: 1280,
-          height: 720,
-          analysis: { sampledPixels: 100, opaqueRatio: 1, luminanceMean: 80, luminanceVariance: 12, likelyBlank: false },
-        },
+        capture: frame,
+        ...(frames > 1 ? { captures: Array.from({ length: frames }, () => frame) } : {}),
       };
     }
     if (request.operation === "close" || request.operation === "closeAll") return { operation: request.operation };
@@ -144,5 +147,71 @@ describe("game use tool", () => {
       path: "/level-1",
     }, undefined, undefined, {} as never)).rejects.toThrow("path is only supported by the web game runtime");
     expect(driver.requests).toHaveLength(0);
+  });
+
+  it("bursts several captures when frames are requested", async () => {
+    const driver = new FakeDriver();
+    const tool = createGameUseTool(driver, async () => ({ runtime: "web", url: "http://127.0.0.1:43210/" }));
+
+    const result = await tool.execute("capture-burst", {
+      operation: "capture",
+      sessionId: "session-1",
+      frames: 3,
+      intervalMs: 80,
+    }, undefined, undefined, {} as never);
+
+    expect(driver.requests).toEqual([{ operation: "capture", sessionId: "session-1", frames: 3, intervalMs: 80 }]);
+    const images = result.content.filter((item) => item.type === "image");
+    expect(images).toHaveLength(3);
+    expect(result.content[0]).toMatchObject({ type: "text", text: expect.stringContaining('"frames"') });
+  });
+
+  it("sweeps default viewports, flags issues, and restores the original viewport", async () => {
+    const driver = new FakeDriver();
+    const tool = createGameUseTool(driver, async () => ({ runtime: "web", url: "http://127.0.0.1:43210/" }));
+
+    const result = await tool.execute("sweep-1", {
+      operation: "sweep",
+      sessionId: "session-1",
+    }, undefined, undefined, {} as never);
+
+    const requests = driver.requests.map((request) => request.operation === "act"
+      ? `resize:${request.actions[0]!.type === "resize" ? `${request.actions[0].viewport.width}x${request.actions[0].viewport.height}` : "?"}`
+      : request.operation);
+    expect(requests).toEqual([
+      "inspect",
+      "resize:375x667", "capture",
+      "resize:768x1024", "capture",
+      "resize:1280x720", "capture",
+      "resize:1280x720",
+    ]);
+    const text = result.content.find((item) => item.type === "text");
+    expect(text).toMatchObject({ text: expect.stringContaining('"originalViewport"') });
+    expect(result.content.filter((item) => item.type === "image")).toHaveLength(3);
+  });
+
+  it("rejects setTimeScale when the runtime has no time control", async () => {
+    const driver = new FakeDriver({ ...WEB_GAME_USE_CAPABILITIES, timeControl: false });
+    const tool = createGameUseTool(driver, async () => ({ runtime: "web", url: "http://127.0.0.1:43210/" }));
+
+    await expect(tool.execute("act-time", {
+      operation: "act",
+      sessionId: "session-1",
+      actions: [{ type: "bridge", method: "setTimeScale", value: 0 }],
+    }, undefined, undefined, {} as never)).rejects.toThrow("time control");
+    expect(driver.requests).toHaveLength(0);
+  });
+
+  it("passes setTimeScale through to the driver when supported", async () => {
+    const driver = new FakeDriver();
+    const tool = createGameUseTool(driver, async () => ({ runtime: "web", url: "http://127.0.0.1:43210/" }));
+
+    await tool.execute("act-time-ok", {
+      operation: "act",
+      sessionId: "session-1",
+      actions: [{ type: "bridge", method: "setTimeScale", value: 0.2 }],
+    }, undefined, undefined, {} as never);
+
+    expect(driver.requests).toEqual([{ operation: "act", sessionId: "session-1", actions: [{ type: "bridge", method: "setTimeScale", value: 0.2 }] }]);
   });
 });

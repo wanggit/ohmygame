@@ -297,18 +297,60 @@ describe("electron playtest driver", () => {
     expect(driver.watchState().activeSessions).toBe(0);
   });
 
-  it("bounds retained browser sessions", async () => {
-    const driver = new ElectronPlaytestDriver();
-    for (let index = 0; index < 4; index++) {
-      await driver.request({ operation: "open", target: { runtime: "web", url: `http://127.0.0.1:43123/${index}` }, viewport: { width: 800, height: 600 } });
-    }
+  it("completes the session lifecycle when the watch state push throws", async () => {
+    const states = vi.fn(() => {
+      throw new TypeError("Render frame was disposed before WebFrameMain could be accessed");
+    });
+    const driver = new ElectronPlaytestDriver(states);
+    const opened = await driver.request({
+      operation: "open",
+      target: { runtime: "web", url: "http://127.0.0.1:43123/" },
+      viewport: { width: 800, height: 600 },
+    });
+    if (opened.operation !== "open") throw new Error("Expected open result");
+    expect(states).toHaveBeenCalled();
 
-    await expect(driver.request({
+    await expect(driver.request({ operation: "close", sessionId: opened.snapshot.sessionId }))
+      .resolves.toEqual({ operation: "close" });
+    expect(driver.watchState()).toEqual({ visible: false, activeSessions: 0 });
+    expect(electron.windows[0]?.destroyed).toBe(true);
+  });
+
+  it("bounds retained browser sessions by evicting the least recently used", async () => {
+    const driver = new ElectronPlaytestDriver();
+    const opened: string[] = [];
+    for (let index = 0; index < 8; index++) {
+      const result = await driver.request({ operation: "open", target: { runtime: "web", url: `http://127.0.0.1:43123/${index}` }, viewport: { width: 800, height: 600 } });
+      if (result.operation !== "open") throw new Error("Expected open result");
+      opened.push(result.snapshot.sessionId);
+    }
+    expect(electron.windows).toHaveLength(8);
+
+    // Touch the second-oldest session so the oldest becomes the eviction target.
+    await driver.request({ operation: "inspect", sessionId: opened[1]! });
+    const overflow = await driver.request({
       operation: "open",
       target: { runtime: "web", url: "http://127.0.0.1:43123/overflow" },
       viewport: { width: 800, height: 600 },
-    })).rejects.toThrow("Close an existing game session");
-    expect(electron.windows).toHaveLength(4);
+    });
+    if (overflow.operation !== "open") throw new Error("Expected open result");
+    expect(electron.windows.filter((window) => !window.destroyed)).toHaveLength(8);
+    expect(electron.windows[0]!.destroyed).toBe(true);
+    expect(electron.windows[1]!.destroyed).toBe(false);
+    driver.close();
+  });
+
+  it("reopens the existing session when the same URL is opened again", async () => {
+    const driver = new ElectronPlaytestDriver();
+    const first = await driver.request({ operation: "open", target: { runtime: "web", url: "http://127.0.0.1:43123/game" }, viewport: { width: 800, height: 600 } });
+    if (first.operation !== "open") throw new Error("Expected open result");
+    const second = await driver.request({ operation: "open", target: { runtime: "web", url: "http://127.0.0.1:43123/game" }, viewport: { width: 1280, height: 720 } });
+    if (second.operation !== "open") throw new Error("Expected open result");
+
+    expect(second.snapshot.sessionId).toBe(first.snapshot.sessionId);
+    expect(electron.windows).toHaveLength(1);
+    expect(electron.windows[0]!.loadURL).toHaveBeenCalledTimes(2);
+    expect(electron.windows[0]!.setContentSize).toHaveBeenLastCalledWith(1280, 720);
     driver.close();
   });
 
