@@ -58,6 +58,31 @@ describe("OhMyGame system prompt", () => {
     }
   });
 
+  it("locks the generation prompt contract: one subject, no outlines or frames, chroma background", () => {
+    for (const type of ["general", "web-game", "godot-game", "interactive-story", "asset-canvas"] as const) {
+      const text = prompt({ type });
+
+      expect(text).toContain("one subject per image");
+      expect(text).toContain("sticker outlines, decorative card frames");
+      expect(text).toContain("glow halos, drop shadows");
+      expect(text).toContain("technical cutout background");
+      expect(text).toContain("never for static props, icons, or UI art");
+      expect(text).toContain("sticker art");
+    }
+  });
+
+  it("requires sprite-qa (or an equivalent check) before integrating prepared art", () => {
+    for (const type of ["general", "web-game", "godot-game", "interactive-story", "asset-canvas"] as const) {
+      const text = prompt({ type });
+
+      expect(text).toContain("sprite-qa");
+      expect(text).toContain("key-color fringe");
+      expect(text).toContain("inter-cell bleed slivers");
+      expect(text).toContain("read the generated zoom inspection image");
+      expect(text).toContain("A fail-level finding blocks integration");
+    }
+  });
+
   it("appends saved personal preferences after the project contract", () => {
     const base = appendSystemPromptForProject({ type: "web-game" });
     expect(appending([])).toEqual(base);
@@ -137,6 +162,28 @@ describe("OhMyGame system prompt", () => {
       expect(text).toContain("tool-producible");
     }
     expect(prompt({ type: "asset-canvas" })).not.toContain("Why players choose this game");
+  });
+
+  it("demands image checks with a checklist, milestone status, and compile-after-write", () => {
+    for (const type of ["general", "web-game", "godot-game", "interactive-story", "asset-canvas"] as const) {
+      const text = prompt({ type });
+
+      expect(text).toContain("check it against a fixed list");
+      expect(text).toContain("Describing image content at length is not deliverable progress");
+      expect(text).toContain("a one-line status at each milestone");
+      expect(text).toContain("a file that does not compile is not a finished step");
+    }
+  });
+
+  it("sets the debug order and exact-edit discipline for bug work", () => {
+    for (const type of ["general", "web-game", "godot-game", "interactive-story", "asset-canvas"] as const) {
+      const text = prompt({ type });
+
+      expect(text).toContain("suspect unbounded growth first");
+      expect(text).toContain("Instrumentation confirms a hypothesis");
+      expect(text).toContain("never edit from remembered text");
+      expect(text).toContain("root cause → change");
+    }
   });
 
   it("tells the Interactive Story agent how to build, use media in, and check Playable Nodes", () => {
