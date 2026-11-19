@@ -25,7 +25,7 @@
 | [`match-3/`](match-3/PLAYBOOK.md)                 | 三消            | 🚫 不做（巨头买量碾压）   | —                                   |
 | [`falling-blocks/`](falling-blocks/PLAYBOOK.md)   | 俄罗斯方块类    | ⏳ 值得模板（⚠️ IP 红线） | —                                   |
 | [`solitaire/`](solitaire/PLAYBOOK.md)             | 纸牌接龙        | ⏳ 值得模板               | —                                   |
-| [`breakout/`](breakout/PLAYBOOK.md)               | 打砖块          | 💡 直接做游戏             | —                                   |
+| [`breakout/`](breakout/PLAYBOOK.md)               | 打砖块          | 💡 直接做游戏             | 《萌兽打砖块》（2026-11-17 已实做）  |
 | [`snake/`](snake/PLAYBOOK.md)                     | 贪吃蛇          | 💡 直接做游戏             | —                                   |
 | [`memory-match/`](memory-match/PLAYBOOK.md)       | 记忆翻牌        | 💡 直接做游戏             | —                                   |
 | [`link-match/`](link-match/PLAYBOOK.md)           | 连连看/麻将接龙 | ⏳ 值得模板（关卡制）     | —                                   |

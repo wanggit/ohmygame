@@ -2949,7 +2949,7 @@ export async function createPiSession(
       return snapshotBeforeMessage();
     }, failCheckpoint)(pi);
   };
-  // Design gate: media production waits for the user's confirmation of the main design document.
+  // Design gate: media production waits for a complete main design document (treated as human-approved automatically once complete).
   const designGateFactory: ExtensionFactory = async (pi) => {
     pi.on("tool_call", async (event) => {
       if (!DESIGN_GATE_TOOL_NAMES.has(event.toolName)) return;

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,20 +8,11 @@ import { CanvasStore } from "../src/daemon/canvas-workspace.js";
 import { ProjectManager } from "../src/daemon/projects.js";
 import { ToolRunner } from "../src/daemon/tools.js";
 import { createAgentTools } from "../src/daemon/agent-tools.js";
+import { designGateForProject, mainDesignRevision } from "../src/daemon/design-confirmation.js";
 import {
-  confirmMainDesign,
-  designGateForProject,
-  mainDesignRevision,
-  readDesignConfirmation,
-  removeDesignConfirmation,
-  writeDesignConfirmation,
-} from "../src/daemon/design-confirmation.js";
-import {
-  DESIGN_CONFIRMATION_FILE,
   countVisualMockups,
   designGateBlockReason,
   designGateState,
-  isDesignConfirmationRecord,
   missingDesignSections,
 } from "../src/shared/design-confirmation.js";
 import type { ImageGenerator } from "../src/daemon/openai-image.js";
@@ -47,47 +38,31 @@ async function runtime(projectType: ProjectType = "web-game", generator: ImageGe
 }
 
 describe("design gate state", () => {
-  const main = { documentId: "design", revision: "rev-2" };
-  const record = { version: 1 as const, documentId: "design", revision: "rev-2", confirmedAt: "2026-10-21T00:00:00.000Z" };
+  const main = (markdown: string) => ({ documentId: "design", revision: "rev-2", markdown });
   it("exempts asset-canvas projects and keeps projects without a main design closed", () => {
-    expect(designGateState("asset-canvas", main, record)).toEqual({ status: "not-required" });
-    expect(designGateState("web-game", undefined, undefined)).toEqual({ status: "no-main-document" });
-    expect(designGateState("web-game", undefined, record)).toEqual({ status: "no-main-document" });
+    expect(designGateState("asset-canvas", main(REQUIRED_DESIGN_SECTIONS))).toEqual({ status: "not-required" });
+    expect(designGateState("web-game", undefined)).toEqual({ status: "no-main-document" });
   });
-  it("awaits confirmation before the first confirm and whenever the main document changes", () => {
-    expect(designGateState("web-game", main, undefined)).toEqual({ status: "awaiting", ...main, reason: "missing" });
-    expect(designGateState("web-game", main, { ...record, documentId: "other" })).toEqual({ status: "awaiting", ...main, reason: "missing" });
-    expect(designGateState("web-game", main, { ...record, revision: "rev-1" })).toEqual({ status: "awaiting", ...main, reason: "stale" });
+  it("treats a complete main design document as human-approved automatically", () => {
+    expect(designGateState("web-game", main(REQUIRED_DESIGN_SECTIONS))).toEqual({ status: "confirmed", documentId: "design", revision: "rev-2", visualMockups: 0 });
+    const withMockups = main(`${REQUIRED_DESIGN_SECTIONS}\n\n![Title mock](a.png)\n\n![Gameplay mock](b.png)`);
+    expect(designGateState("web-game", withMockups)).toEqual({ status: "confirmed", documentId: "design", revision: "rev-2", visualMockups: 2 });
   });
-  it("confirms only the recorded revision of the current main document", () => {
-    expect(designGateState("web-game", main, record)).toEqual({ status: "confirmed", documentId: "design", revision: "rev-2", confirmedAt: record.confirmedAt });
+  it("keeps the gate closed and reports the missing sections until the document answers both questions", () => {
+    expect(designGateState("web-game", main("## Core loop\n\nShoot and dodge."))).toEqual({ status: "awaiting", documentId: "design", revision: "rev-2", reason: "missing-sections", missing: ["Why players choose this game", "Skills and capabilities required"] });
+    expect(designGateState("web-game", main("## Why players choose this game\n\nFresh theme."))).toEqual({ status: "awaiting", documentId: "design", revision: "rev-2", reason: "missing-sections", missing: ["Skills and capabilities required"] });
   });
-  it("keeps the gate confirmed for content edits under unchanged headings and stales on structural edits", () => {
-    const structured = { ...record, structure: "## why players choose this game\n## skills and capabilities required" };
-    const refined = { documentId: "design", revision: "rev-3", structure: structured.structure };
-    expect(designGateState("web-game", refined, structured)).toEqual({ status: "confirmed", documentId: "design", revision: "rev-3", confirmedAt: structured.confirmedAt });
-    const restructured = { ...refined, structure: "## why players choose this game\n## skills and capabilities required\n## vfx requirements" };
-    expect(designGateState("web-game", restructured, structured)).toEqual({ status: "awaiting", documentId: "design", revision: "rev-3", reason: "stale" });
-    expect(designGateState("web-game", refined, record)).toEqual({ status: "awaiting", documentId: "design", revision: "rev-3", reason: "stale" });
-  });
-  it("explains how to open the gate whenever it blocks a production tool", () => {
-    expect(designGateBlockReason(designGateState("asset-canvas", main, record))).toBeUndefined();
-    expect(designGateBlockReason(designGateState("web-game", main, record))).toBeUndefined();
-    expect(designGateBlockReason(designGateState("web-game", undefined, undefined))).toContain("no main design document");
-    expect(designGateBlockReason(designGateState("web-game", main, undefined))).toContain("not confirmed");
-    expect(designGateBlockReason(designGateState("web-game", main, { ...record, revision: "rev-1" }))).toContain("edited since the last confirmation");
-    for (const blocked of [designGateState("web-game", undefined, undefined), designGateState("web-game", main, undefined), designGateState("web-game", main, { ...record, revision: "rev-1" })]) {
-      expect(designGateBlockReason(blocked)).toContain("Confirm design");
-    }
-  });
-  it("validates stored confirmation records", () => {
-    expect(isDesignConfirmationRecord(record)).toBe(true);
-    expect(isDesignConfirmationRecord({ ...record, version: 2 })).toBe(false);
-    expect(isDesignConfirmationRecord({ ...record, documentId: "bad id!" })).toBe(false);
-    expect(isDesignConfirmationRecord({ ...record, revision: "" })).toBe(false);
-    expect(isDesignConfirmationRecord({ ...record, structure: "## ok" })).toBe(true);
-    expect(isDesignConfirmationRecord({ ...record, structure: 7 })).toBe(false);
-    expect(isDesignConfirmationRecord(null)).toBe(false);
+  it("explains how to complete the design whenever it blocks a production tool", () => {
+    expect(designGateBlockReason(designGateState("asset-canvas", main(REQUIRED_DESIGN_SECTIONS)))).toBeUndefined();
+    expect(designGateBlockReason(designGateState("web-game", main(REQUIRED_DESIGN_SECTIONS)))).toBeUndefined();
+    const noDocument = designGateBlockReason(designGateState("web-game", undefined))!;
+    expect(noDocument).toContain("no main design document");
+    expect(noDocument).toContain("human-approved automatically");
+    const incomplete = designGateBlockReason(designGateState("web-game", main("## Core loop")))!;
+    expect(incomplete).toContain("missing required sections");
+    expect(incomplete).toContain("Why players choose this game");
+    expect(incomplete).toContain("human-approved automatically");
+    for (const blocked of [noDocument, incomplete]) expect(blocked).toContain("do not work around this gate");
   });
 });
 
@@ -99,101 +74,69 @@ describe("design required sections", () => {
     expect(missingDesignSections("## Why This Game\n\nA fresh theme.\n\n## Skills needed\n\n- Art: available")).toEqual([]);
     expect(missingDesignSections("## 玩家为什么选我们\n\n差异化主题。\n\n## 技能需求清单\n\n- 美术：可用")).toEqual([]);
   });
-  it("refuses to confirm a document that skips either question and accepts one that answers both", async () => {
+  it("opens the gate automatically once a document answers both questions", async () => {
     const { project, store } = await runtime();
     const doc = await store.createDocument(project.id, "Design");
     const skipped = await store.save(project.id, { ...doc.document, markdown: "## Core loop\n\nShoot and dodge." }, doc.revision, doc.document.id);
-    await expect(confirmMainDesign(project.workspacePath)).rejects.toThrow("Missing sections: Why players choose this game; Skills and capabilities required");
-    await expect(confirmMainDesign(project.workspacePath)).rejects.toThrow("mature gameplay");
+    expect(await designGateForProject(project.workspacePath, project.type)).toMatchObject({ status: "awaiting", reason: "missing-sections", missing: ["Why players choose this game", "Skills and capabilities required"] });
     await store.save(project.id, { ...doc.document, markdown: REQUIRED_DESIGN_SECTIONS }, skipped.revision, doc.document.id);
-    await expect(confirmMainDesign(project.workspacePath)).resolves.toMatchObject({ documentId: doc.document.id });
+    expect(await designGateForProject(project.workspacePath, project.type)).toMatchObject({ status: "confirmed", documentId: doc.document.id });
   });
-  it("counts embedded visual mockups at confirmation time", async () => {
+  it("counts embedded visual mockups", async () => {
     const { project, store } = await runtime();
     const doc = await store.createDocument(project.id, "Design");
     const withMockups = `${REQUIRED_DESIGN_SECTIONS}\n\n![Title mock](assets/mock-title.png)\n\n![Gameplay mock](assets/mock-game.png)`;
-    const saved = await store.save(project.id, { ...doc.document, markdown: withMockups }, doc.revision, doc.document.id);
-    const record = await confirmMainDesign(project.workspacePath);
-    expect(record.visualMockups).toBe(2);
+    await store.save(project.id, { ...doc.document, markdown: withMockups }, doc.revision, doc.document.id);
     expect(countVisualMockups(withMockups)).toBe(2);
     expect(countVisualMockups(REQUIRED_DESIGN_SECTIONS)).toBe(0);
     expect(await designGateForProject(project.workspacePath, project.type)).toMatchObject({ status: "confirmed", visualMockups: 2 });
-    void saved;
   });
 });
 
-describe("design confirmation files", () => {
-  it("records the main design revision, stales after edits and forgets on removal", async () => {
+describe("design gate resolution", () => {
+  it("follows the main design document automatically and never needs re-approval", async () => {
     const { project, store } = await runtime();
     expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "no-main-document" });
-    await expect(confirmMainDesign(project.workspacePath)).rejects.toThrow("No main design document");
     const doc = await store.createDocument(project.id, "Design");
+    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "awaiting", documentId: doc.document.id, revision: doc.revision, reason: "missing-sections", missing: ["Why players choose this game", "Skills and capabilities required"] });
     const answered = await store.save(project.id, { ...doc.document, markdown: REQUIRED_DESIGN_SECTIONS }, doc.revision, doc.document.id);
-    const main = await mainDesignRevision(project.workspacePath);
-    expect(main).toEqual({ documentId: doc.document.id, revision: answered.revision });
-    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "awaiting", ...main, reason: "missing" });
-    const record = await confirmMainDesign(project.workspacePath);
-    expect(record).toMatchObject({ version: 1, documentId: doc.document.id, revision: answered.revision, visualMockups: 0 });
-    expect(await readDesignConfirmation(project.workspacePath)).toEqual(record);
-    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "confirmed", documentId: doc.document.id, revision: answered.revision, confirmedAt: record.confirmedAt, visualMockups: 0 });
-    const saved = await store.save(project.id, { ...doc.document, markdown: "A tighter loop" }, answered.revision, doc.document.id);
-    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "awaiting", documentId: doc.document.id, revision: saved.revision, reason: "stale" });
-    await removeDesignConfirmation(project.workspacePath);
-    expect(await readDesignConfirmation(project.workspacePath)).toBeUndefined();
-    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "awaiting", documentId: doc.document.id, revision: saved.revision, reason: "missing" });
+    expect(await mainDesignRevision(project.workspacePath)).toEqual({ documentId: doc.document.id, revision: answered.revision });
+    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "confirmed", documentId: doc.document.id, revision: answered.revision, visualMockups: 0 });
+    // Later edits follow the document automatically: refinements and structural changes never reopen the gate.
+    const refined = await store.save(project.id, { ...doc.document, markdown: `${REQUIRED_DESIGN_SECTIONS}\n\n## Implementation notes\n\nTuning lives in canvas tables.` }, answered.revision, doc.document.id);
+    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "confirmed", documentId: doc.document.id, revision: refined.revision, visualMockups: 0 });
+    const stripped = await store.save(project.id, { ...doc.document, markdown: "## Core loop\n\nShoot and dodge." }, refined.revision, doc.document.id);
+    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "awaiting", documentId: doc.document.id, revision: stripped.revision, reason: "missing-sections", missing: ["Why players choose this game", "Skills and capabilities required"] });
   });
-  it("keeps the gate closed when the confirmation file is damaged and exempts asset-canvas", async () => {
-    const { project, store } = await runtime();
-    const doc = await store.createDocument(project.id, "Design");
-    const answered = await store.save(project.id, { ...doc.document, markdown: REQUIRED_DESIGN_SECTIONS }, doc.revision, doc.document.id);
-    await confirmMainDesign(project.workspacePath);
-    await writeFile(path.join(project.workspacePath, DESIGN_CONFIRMATION_FILE), "{damaged");
-    expect(await readDesignConfirmation(project.workspacePath)).toBeUndefined();
-    expect(await designGateForProject(project.workspacePath, project.type)).toEqual({ status: "awaiting", documentId: doc.document.id, revision: answered.revision, reason: "missing" });
+  it("exempts asset-canvas projects", async () => {
     const { project: canvasProject } = await runtime("asset-canvas");
     expect(await designGateForProject(canvasProject.workspacePath, canvasProject.type)).toEqual({ status: "not-required" });
-    expect(await readDesignConfirmation(canvasProject.workspacePath)).toBeUndefined();
-  });
-  it("rejects stored records that fail validation", async () => {
-    const { project } = await runtime();
-    await mkdir(path.join(project.workspacePath, "canvas"), { recursive: true });
-    await writeFile(path.join(project.workspacePath, DESIGN_CONFIRMATION_FILE), JSON.stringify({ version: 1, documentId: "bad id!", revision: "r", confirmedAt: "t" }));
-    expect(await readDesignConfirmation(project.workspacePath)).toBeUndefined();
-    await writeDesignConfirmation(project.workspacePath, { version: 1, documentId: "ok_id-1", revision: "r", confirmedAt: "t" });
-    expect(await readDesignConfirmation(project.workspacePath)).toMatchObject({ documentId: "ok_id-1" });
   });
 });
 
-describe("design confirmation routes", () => {
-  it("confirms, stales and resets the gate through the API", async () => {
+describe("design gate routes", () => {
+  it("reports the gate state and offers no confirm action", async () => {
     const app = createApp({ dataDirectory: await temp() }); apps.push(app);
     const project = (await app.inject({ method: "POST", url: "/projects", payload: {} })).json(), base = `/projects/${project.id}/canvas`;
     expect((await app.inject(`${base}/design-confirmation`)).json()).toEqual({ status: "no-main-document" });
-    const failed = await app.inject({ method: "POST", url: `${base}/design-confirmation`, payload: { action: "confirm" } });
-    expect(failed.statusCode).toBe(500);
-    expect(failed.json().error).toContain("No main design document");
     const doc = (await app.inject({ method: "POST", url: `${base}/documents`, payload: { title: "Design" } })).json();
-    expect((await app.inject(`${base}/design-confirmation`)).json()).toMatchObject({ status: "awaiting", reason: "missing", documentId: doc.document.id });
+    expect((await app.inject(`${base}/design-confirmation`)).json()).toMatchObject({ status: "awaiting", reason: "missing-sections", documentId: doc.document.id });
     const answered = (await app.inject({ method: "PUT", url: `${base}?documentId=${doc.document.id}`, payload: { ...doc, document: { ...doc.document, markdown: REQUIRED_DESIGN_SECTIONS } } })).json();
-    const confirmed = await app.inject({ method: "POST", url: `${base}/design-confirmation`, payload: { action: "confirm" } });
-    expect(confirmed.statusCode).toBe(200);
-    expect(confirmed.json()).toMatchObject({ status: "confirmed", documentId: doc.document.id, revision: answered.revision });
+    expect((await app.inject(`${base}/design-confirmation`)).json()).toEqual({ status: "confirmed", documentId: doc.document.id, revision: answered.revision, visualMockups: 0 });
     await app.inject({ method: "PUT", url: `${base}?documentId=${doc.document.id}`, payload: { ...answered, document: { ...answered.document, markdown: "Changed" } } });
-    expect((await app.inject(`${base}/design-confirmation`)).json()).toMatchObject({ status: "awaiting", reason: "stale" });
-    const reset = await app.inject({ method: "POST", url: `${base}/design-confirmation`, payload: { action: "reset" } });
-    expect(reset.json()).toMatchObject({ status: "awaiting", reason: "missing" });
-    expect((await app.inject({ method: "POST", url: `${base}/design-confirmation`, payload: { action: "skip" } })).statusCode).toBe(400);
+    expect((await app.inject(`${base}/design-confirmation`)).json()).toMatchObject({ status: "awaiting", reason: "missing-sections" });
+    // The gate opens from the document alone; there is no confirm/reset action left to call.
+    expect((await app.inject({ method: "POST", url: `${base}/design-confirmation`, payload: { action: "confirm" } })).statusCode).toBe(404);
   });
   it("reports the gate as not required for asset-canvas projects", async () => {
     const app = createApp({ dataDirectory: await temp() }); apps.push(app);
     const project = (await app.inject({ method: "POST", url: "/projects", payload: { type: "asset-canvas" } })).json();
     expect((await app.inject(`/projects/${project.id}/canvas/design-confirmation`)).json()).toEqual({ status: "not-required" });
-    expect((await app.inject({ method: "POST", url: `/projects/${project.id}/canvas/design-confirmation`, payload: { action: "confirm" } })).json()).toEqual({ status: "not-required" });
   });
 });
 
 describe("agent media gate", () => {
-  it("blocks generate_canvas_media until the user confirms and allows it afterwards", async () => {
+  it("blocks generate_canvas_media until the main design is complete and allows it right after", async () => {
     const generate = vi.fn(fakeGenerator.generate);
     const { project, store, projects, tools } = await runtime("web-game", { generate });
     const workspace = await store.workspace(project.id), boardId = workspace.boards[0]!.id;
@@ -201,13 +144,16 @@ describe("agent media gate", () => {
     if (node.type === "image") node.data.prompt = "A gardener";
     detail.board.nodes.push(node); detail.board.editorLayout.nodes[node.id] = node.position;
     await store.saveBoard(project.id, detail.board, detail.revision);
-    const doc = await store.createDocument(project.id, "Design");
-    await store.save(project.id, { ...doc.document, markdown: REQUIRED_DESIGN_SECTIONS }, doc.revision, doc.document.id);
     const registered = createAgentTools(project, tools, projects, undefined, undefined, undefined, undefined, store);
     const tool = registered.find((candidate) => candidate.name === "generate_canvas_media")!;
     await expect(tool.execute("blocked", { boardId, nodeId: node.id }, undefined, undefined, {} as never)).rejects.toThrow(/Design gate/);
     expect(generate).not.toHaveBeenCalled();
-    await confirmMainDesign(project.workspacePath);
+    const doc = await store.createDocument(project.id, "Design");
+    const incomplete = await store.save(project.id, { ...doc.document, markdown: "## Core loop\n\nPlant seeds." }, doc.revision, doc.document.id);
+    await expect(tool.execute("blocked-again", { boardId, nodeId: node.id }, undefined, undefined, {} as never)).rejects.toThrow(/missing required sections/);
+    expect(generate).not.toHaveBeenCalled();
+    // Completing the required sections opens the gate automatically — no user confirmation happens in between.
+    await store.save(project.id, { ...doc.document, markdown: REQUIRED_DESIGN_SECTIONS }, incomplete.revision, doc.document.id);
     const result = await tool.execute("allowed", { boardId, nodeId: node.id }, undefined, undefined, {} as never);
     expect(result.details).toMatchObject({ canvasGeneration: { status: "succeeded", context: { boardId, nodeId: node.id } } });
     expect(generate).toHaveBeenCalled();

@@ -7,8 +7,7 @@ import { CanvasError, CanvasStore } from "./canvas-workspace.js";
 import type { ProjectManager } from "./projects.js";
 import type { AssetLibrary } from "./asset-library.js";
 import { ToolRunError, type ToolRunner } from "./tools.js";
-import { confirmMainDesign, designGateForProject, removeDesignConfirmation } from "./design-confirmation.js";
-import { designGateRequired } from "../shared/design-confirmation.js";
+import { designGateForProject } from "./design-confirmation.js";
 
 export function registerCanvasRoutes(app: FastifyInstance, options: {
   projects: ProjectManager; library: AssetLibrary; tools: ToolRunner;
@@ -58,17 +57,6 @@ export function registerCanvasRoutes(app: FastifyInstance, options: {
   app.get<{ Params: { projectId: string } }>(`${base}/design-confirmation`, async (request, reply) => {
     try {
       const { project, workspace } = projectWorkspace(request.params.projectId);
-      return await designGateForProject(workspace, project.type);
-    } catch (cause) { return failure(cause, reply); }
-  });
-  app.post<{ Params: { projectId: string }; Body: { action: "confirm" | "reset" } }>(`${base}/design-confirmation`, {
-    schema: { body: { type: "object", additionalProperties: false, required: ["action"], properties: { action: { enum: ["confirm", "reset"] } } } },
-  }, async (request, reply) => {
-    try {
-      const { project, workspace } = projectWorkspace(request.params.projectId);
-      if (request.body.action === "confirm") {
-        if (designGateRequired(project.type)) await confirmMainDesign(workspace);
-      } else await removeDesignConfirmation(workspace);
       return await designGateForProject(workspace, project.type);
     } catch (cause) { return failure(cause, reply); }
   });

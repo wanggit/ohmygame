@@ -13,6 +13,8 @@ Before substantial UI work, identify the game's fantasy, camera, primary actions
 
 Make mockups depict real gameplay information and actions. Carry the world's shapes, materials, and palette into icons, frames, and buttons.
 
+When mockups carry CJK or other non-Latin text, verify glyph coverage with a rendered font test strip before settling the font stack — some system faces (e.g. macOS PingFang) lack simplified-Chinese-only glyphs and silently render tofu boxes that propagate into every downstream reference. Render a small strip of the actual characters, look at it, then commit to the font (on macOS, Hiragino Sans GB or STHeiti cover simplified Chinese).
+
 ## Layout Rules
 
 - Protect the center and primary action area of the playfield.

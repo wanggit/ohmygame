@@ -28,7 +28,6 @@ export const generateCanvasText = (id: string, instruction: string, model: Agent
 export const generateCanvasDocument = (id: string, documentId: string, input: CanvasDocumentGenerationRequest, version?: string): Promise<CanvasDocumentGenerationResponse> => request(`${base(id)}/documents/${encodeURIComponent(documentId)}/generate`, { method: "POST", body: JSON.stringify(input), workspaceVersion: version });
 
 export const getDesignConfirmation = (id: string): Promise<DesignGateState> => canvasRequest(`${base(id)}/design-confirmation`);
-export const setDesignConfirmation = (id: string, action: "confirm" | "reset", version?: string): Promise<DesignGateState> => canvasRequest(`${base(id)}/design-confirmation`, { method: "POST", body: JSON.stringify({ action }), workspaceVersion: version });
 
 export const createCanvasTable = (id: string, title: string, version?: string): Promise<CanvasTableDetail> => canvasRequest(`${base(id)}/tables`, { method: "POST", body: JSON.stringify({ title }), workspaceVersion: version });
 export const getCanvasTable = (id: string, tableId: string): Promise<CanvasTableDetail> => canvasRequest(`${base(id)}/tables/${encodeURIComponent(tableId)}`);

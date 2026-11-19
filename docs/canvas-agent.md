@@ -152,39 +152,38 @@ Three tools supplement ordinary file editing:
   history, materializes output in the project, and writes the output ID back
   to the node. Changing a file does not start generation.
 
-## Design Confirmation Gate
+## Design Gate
 
 Game projects (every project type except `asset-canvas`) keep agent media
-production behind a design confirmation. The agent discusses the core loop with
-the user and records the agreed design in the main design document; the user
-then confirms that document (Confirm design on its node). Until the
-confirmation exists, agent media tools (`generate_canvas_media` and the media
+production behind a design gate. The agent discusses the core loop with
+the user and records the agreed design in the main design document. Until that
+document is complete, agent media tools (`generate_canvas_media` and the media
 generation tools of the active coding agent) are blocked with guidance instead
-of running.
+of running. Completing the document is enough: a complete main design document
+is treated as human-approved automatically — there is no user confirmation
+step, and no UI control to press.
 
 The main design document must answer two questions in dedicated sections
-before confirmation succeeds: **Why players choose this game** (how the game
+before the gate opens: **Why players choose this game** (how the game
 differs from similar games with mature gameplay — theme, art, mechanical
 variation, feel, audience) and **Skills and capabilities required** (the skills
 building the game needs and their availability: available, tool-producible,
-externally needed, or missing). `confirmMainDesign` rejects a document missing
-either section and reports which ones; heading matching accepts English and
-Chinese wording of these two questions. The confirmation also counts the
+externally needed, or missing). A document missing either section keeps the
+gate closed (`awaiting` with reason `missing-sections`) and the block message
+reports which sections are missing; heading matching accepts English and
+Chinese wording of these two questions. The gate also counts the
 visual mockups embedded in the document (`visualMockups`); agents should embed
-at least two (generated reference images or code-rendered stills) so the user
-confirms the visual direction together with the design, and the prompt context
+at least two (generated reference images or code-rendered stills) so the
+visual direction is settled before implementation, and the prompt context
 suggests adding more when the count is low.
 
-The confirmation is stored in `canvas/design-confirmation.json` and records the
-document ID, revision, and section-heading fingerprint it confirmed. An edit
-that keeps every section heading intact refines the confirmed design and leaves
-the gate closed; adding, removing, or renaming a heading — or editing a document
-confirmed before fingerprinting existed — changes the revision anchor and
-reopens the gate (`awaiting` with reason `stale`); the user
-must confirm again before generation resumes. Projects without a main design
-document keep the gate closed (`no-main-document`), including when the canvas
-workspace cannot be read. `GET`/`POST /projects/:projectId/canvas/design-confirmation`
-exposes the same state and the confirm/reset actions.
+The gate state is derived from the current main design document on every
+check. There is no stored confirmation record: adding sections opens the
+gate, removing them closes it again, and ordinary edits — refinements,
+implementation notes, restructured headings — never reopen anything.
+Projects without a main design document keep the gate closed
+(`no-main-document`), including when the canvas workspace cannot be read.
+`GET /projects/:projectId/canvas/design-confirmation` exposes the same state.
 
 The gate governs agent-driven production only. Manual generation from the canvas
 UI, text generation, and ordinary file editing stay available, and `asset-canvas`

@@ -33,6 +33,10 @@ Use these boundaries in proportion to the project. A small game does not need an
 - When node cannot import the TypeScript sources directly (for example Phaser projects), make the `test` script bundle the pure-logic module first and then run the tests against that bundle — `esbuild src/game/logic.ts --bundle --format=esm --outfile=build-test/logic.mjs && node test/logic.test.mjs` — so a test can never run against a stale bundle. Encode this order in the script instead of hand-sequencing it in ad-hoc shell commands.
 - Do not rely on the dev server's default `localhost` binding: it may resolve to IPv6 `::1` and break tooling that connects over 127.0.0.1. Prefer `127.0.0.1` explicitly and let the editor choose the port.
 
+## Deterministic Simulation Tests
+
+A deterministic physics or movement core gets a soak test from day one, not after the first bug: run a long fixed-step simulation (10k+ steps) asserting invariants every frame — speed within range, a directional floor (e.g. vertical component ≥ 40% of speed so a ball never settles into a horizontal ping-pong), in-bounds entities, entity caps, finite values. Collect violations in a plain list and assert once at the end; one `expect()` per step piles up assertion objects and can OOM the test runner. Action-level unit tests miss experience bugs that only appear over thousands of frames.
+
 ## Game Data Tables
 
 - Balance numbers, tuning values and configuration lists live in canvas tables (`canvas/tables/<tableId>.json`), which the user reviews and adopts in the canvas. One table per system (for example economy, enemy stats, item stats, stage config); typed columns and stable column IDs are the data contract.
